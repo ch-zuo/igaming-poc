@@ -1,0 +1,139 @@
+const express = require('express');
+const router = express.Router();
+const supabaseService = require('../services/supabase');
+const ftService = require('../services/ft-integration');
+
+// Middleware to mock authentication or extract token
+const authenticateUser = async (req, res, next) => {
+    const token = req.headers['authorization']; // Expecting "Bearer <token>"
+
+    // For simplicity in this PoC, we might accept just the token string or Bearer
+    const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
+
+    if (!actualToken) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const user = await supabaseService.getUser(actualToken);
+    if (!user) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    req.user = user;
+    next();
+};
+
+router.post('/authenticate', authenticateUser, async (req, res) => {
+    // If middleware passes, user is authenticated
+    // Push 'login' event to FT
+    ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
+
+    res.json({
+        sid: 'session-' + req.user.id + '-' + Date.now(),
+        user_id: req.user.id,
+        currency: req.user.currency
+    });
+});
+
+router.get('/balance', authenticateUser, async (req, res) => {
+    res.json({
+        amount: req.user.balance,
+        currency: req.user.currency
+    });
+});
+
+// Mock Game Provider calls these, likely with a different auth mechanism (Server-to-Server)
+// For PoC, we'll assume the same auth for simplicity or a specific "Game Provider" secret.
+// Let's implement a simple "Game Provider" check or just reuse user auth if the simulator acts on behalf of user.
+// The prompt said "Mock Game Provider... hits the Core Platform's casino endpoint".
+// Usually this is S2S. Let's assume a secret key check for debit/credit.
+
+const verifyGameProvider = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    const validKey = process.env.OPERATOR_API_KEY;
+
+    // Allow if no key configured (dev mode) or keys match
+    if (validKey && apiKey !== validKey) {
+        return res.status(401).json({ error: 'Invalid x-api-key' });
+    }
+    next();
+};
+
+router.post('/debit', verifyGameProvider, async (req, res) => {
+    const { user_id, amount, transaction_id, game_id } = req.body;
+
+    if (!user_id || !amount) {
+        return res.status(400).json({ error: 'Missing user_id or amount' });
+    }
+
+    const user = await supabaseService.getUserById(user_id);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.balance < amount) {
+        return res.status(402).json({ error: 'Insufficient funds' });
+    }
+
+    const newBalance = user.balance - amount;
+    await supabaseService.updateBalance(user.id, newBalance);
+
+    // Push event
+    ftService.pushEvent(user.id, 'bet', {
+        amount,
+        transaction_id,
+        game_id,
+        balance_after: newBalance
+    });
+
+    res.json({
+        transaction_id,
+        balance: newBalance,
+        currency: user.currency
+    });
+});
+
+router.post('/credit', verifyGameProvider, async (req, res) => {
+    const { user_id, amount, transaction_id, game_id } = req.body;
+
+    if (!user_id || amount === undefined) {
+        return res.status(400).json({ error: 'Missing user_id or amount' });
+    }
+
+    const user = await supabaseService.getUserById(user_id);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newBalance = user.balance + amount;
+    await supabaseService.updateBalance(user.id, newBalance);
+
+    // Push event
+    ftService.pushEvent(user.id, 'win', {
+        amount,
+        transaction_id,
+        game_id,
+        balance_after: newBalance
+    });
+
+    res.json({
+        transaction_id,
+        balance: newBalance,
+        currency: user.currency
+    });
+});
+
+// Helper for PoC Frontend "Deposit" button
+router.post('/deposit', authenticateUser, async (req, res) => {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+    const newBalance = req.user.balance + amount;
+    await supabaseService.updateBalance(req.user.id, newBalance);
+
+    ftService.pushEvent(req.user.id, 'deposit', { amount, balance_after: newBalance });
+
+    res.json({ balance: newBalance, currency: req.user.currency });
+});
+
+module.exports = router;
