@@ -25,8 +25,12 @@ const authenticateUser = async (req, res, next) => {
 
 router.post('/authenticate', authenticateUser, async (req, res) => {
     // If middleware passes, user is authenticated
-    // Push 'login' event to FT
+    // Push 'login' and 'balance' events to FT
     await ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
+    await ftService.pushEvent(req.user.id, 'balance', {
+        amount: req.user.balance,
+        currency: req.user.currency
+    });
 
     res.json({
         sid: 'session-' + req.user.id + '-' + Date.now(),
@@ -93,12 +97,17 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     const newBalance = user.balance - amount;
     await supabaseService.updateBalance(user.id, newBalance);
 
-    // Push event
+    // Push bet and balance events
     await ftService.pushEvent(user.id, 'bet', {
         amount,
         transaction_id,
         game_id,
-        balance_after: newBalance
+        balance_after: newBalance,
+        currency: user.currency
+    });
+    await ftService.pushEvent(user.id, 'balance', {
+        amount: newBalance,
+        currency: user.currency
     });
 
     res.json({
@@ -123,12 +132,17 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     const newBalance = user.balance + amount;
     await supabaseService.updateBalance(user.id, newBalance);
 
-    // Push event
+    // Push win and balance events
     await ftService.pushEvent(user.id, 'win', {
         amount,
         transaction_id,
         game_id,
-        balance_after: newBalance
+        balance_after: newBalance,
+        currency: user.currency
+    });
+    await ftService.pushEvent(user.id, 'balance', {
+        amount: newBalance,
+        currency: user.currency
     });
 
     res.json({
@@ -146,7 +160,15 @@ router.post('/deposit', authenticateUser, async (req, res) => {
     const newBalance = req.user.balance + amount;
     await supabaseService.updateBalance(req.user.id, newBalance);
 
-    await ftService.pushEvent(req.user.id, 'deposit', { amount, balance_after: newBalance });
+    await ftService.pushEvent(req.user.id, 'deposit', {
+        amount,
+        balance_after: newBalance,
+        currency: req.user.currency
+    });
+    await ftService.pushEvent(req.user.id, 'balance', {
+        amount: newBalance,
+        currency: req.user.currency
+    });
 
     res.json({ balance: newBalance, currency: req.user.currency });
 });
