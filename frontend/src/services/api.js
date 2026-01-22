@@ -24,7 +24,7 @@ export const deposit = async (token, amount) => {
 };
 
 // Simulation of Game Provider calling Backend
-export const placeBet = async (userId, amount) => {
+export const placeBet = async (token, userId, amount) => {
     // In real life, Game Client calls Game Server -> Game Server calls Core.
     // We will call Core directly here for simplicity, or use this in Game Simulator.
     // Note: Backend 'debit' requires 'user_id' in body, not token auth (S2S).
@@ -33,16 +33,20 @@ export const placeBet = async (userId, amount) => {
         amount,
         transaction_id: `tx-${Date.now()}`,
         game_id: 'slot-game-1'
+    }, {
+        headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
 };
 
-export const winPrize = async (userId, amount) => {
+export const winPrize = async (token, userId, amount) => {
     const response = await axios.post(`${API_URL}/credit`, {
         user_id: userId,
         amount,
         transaction_id: `tx-${Date.now()}`,
         game_id: 'slot-game-1'
+    }, {
+        headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
 };

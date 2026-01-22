@@ -35,7 +35,7 @@ function Dashboard({ user, token, onLogout }) {
         try {
             setStatus('Spinning...');
             // 1. Bet 10
-            await placeBet(user.user_id, 10);
+            await placeBet(token, user.user_id, 10);
             setBalance(b => b - 10); // Optimistic update or refetch
 
             // 2. Random Win
@@ -43,7 +43,7 @@ function Dashboard({ user, token, onLogout }) {
                 const isWin = Math.random() > 0.7;
                 if (isWin) {
                     const winAmount = 20;
-                    await winPrize(user.user_id, winAmount);
+                    await winPrize(token, user.user_id, winAmount);
                     setBalance(b => b + winAmount);
                     setStatus('You Won 20!');
                 } else {
