@@ -26,7 +26,7 @@ const authenticateUser = async (req, res, next) => {
 router.post('/authenticate', authenticateUser, async (req, res) => {
     // If middleware passes, user is authenticated
     // Push 'login' event to FT
-    ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
+    await ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
 
     res.json({
         sid: 'session-' + req.user.id + '-' + Date.now(),
@@ -94,7 +94,7 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     await supabaseService.updateBalance(user.id, newBalance);
 
     // Push event
-    ftService.pushEvent(user.id, 'bet', {
+    await ftService.pushEvent(user.id, 'bet', {
         amount,
         transaction_id,
         game_id,
@@ -124,7 +124,7 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     await supabaseService.updateBalance(user.id, newBalance);
 
     // Push event
-    ftService.pushEvent(user.id, 'win', {
+    await ftService.pushEvent(user.id, 'win', {
         amount,
         transaction_id,
         game_id,
@@ -146,7 +146,7 @@ router.post('/deposit', authenticateUser, async (req, res) => {
     const newBalance = req.user.balance + amount;
     await supabaseService.updateBalance(req.user.id, newBalance);
 
-    ftService.pushEvent(req.user.id, 'deposit', { amount, balance_after: newBalance });
+    await ftService.pushEvent(req.user.id, 'deposit', { amount, balance_after: newBalance });
 
     res.json({ balance: newBalance, currency: req.user.currency });
 });
