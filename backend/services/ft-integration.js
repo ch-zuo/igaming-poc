@@ -40,34 +40,53 @@ const pushEvent = async (userId, eventType, payload) => {
 
         console.log(`[FT Integration] Target URL: ${targetUrl} [${config.method}]`);
 
-        // Standardize payload wrapping if needed, or pass 'payload' directly as 'data' 
-        // Note: The specific schemas vary, but typically include user_id at top level.
-        // Merging user_id into payload if not present.
+        // Refine payload based on Fast Track documentation
         let requestBody = {
             user_id: userId,
-            timestamp: new Date().toISOString(),
             ...payload
         };
 
-        if (eventType === 'deposit') {
-            requestBody = { ...requestBody, type: 'Credit', status: 'Approved', provider: 'MockBank' };
-        } else if (eventType === 'bet') {
-            requestBody = { ...requestBody, type: 'Bet', status: 'Approved', game_provider: 'MockProvider' };
-        } else if (eventType === 'win') {
-            requestBody = { ...requestBody, type: 'Win', status: 'Approved', game_provider: 'MockProvider' };
+        // Event-specific data enrichment
+        if (eventType === 'login') {
+            requestBody = {
+                user_id: userId,
+                session_id: payload.session_id || `sess-${Date.now()}`,
+                ip_address: payload.ip_address || '127.0.0.1',
+                user_agent: payload.user_agent || 'Mozilla/5.0',
+                device_type: payload.device_type || 'Desktop'
+            };
+        } else if (eventType === 'deposit' || eventType === 'payment') {
+            requestBody = {
+                user_id: userId,
+                type: 'Deposit',
+                status: 'Approved',
+                amount: payload.amount,
+                currency: payload.currency || 'EUR',
+                transaction_id: payload.transaction_id || `tx-${Date.now()}`,
+                provider: payload.provider || 'MockBank',
+                balance_after: payload.balance_after
+            };
+        } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
+            requestBody = {
+                user_id: userId,
+                type: eventType === 'win' ? 'Win' : 'Bet',
+                status: 'Approved',
+                game_id: payload.game_id || 'unknown',
+                game_provider: payload.game_provider || 'MockProvider',
+                transaction_id: payload.transaction_id || `ctx-${Date.now()}`,
+                amount: payload.amount,
+                currency: payload.currency || 'EUR',
+                balance_after: payload.balance_after,
+                cashtype: 'Cash'
+            };
         }
-
-        // For some endpoints like 'login', 'data' might be a specific object. 
-        // Given the generic usage in operator.js, we assume 'payload' contains the specific fields 
-        // required by the endpoint (or is the 'data' property itself).
-        // For safety/flexibility, we just spread it.
 
         const response = await axios({
             method: config.method,
             url: targetUrl,
             data: requestBody,
             headers: {
-                'Authorization': `Bearer ${FT_API_KEY}`,
+                'X-API-Key': FT_API_KEY,
                 'Content-Type': 'application/json'
             }
         });
