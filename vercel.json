@@ -7,20 +7,12 @@
         },
         {
             "source": "/(.*)",
-            "destination": "/frontend/dist/index.html"
+            "destination": "/frontend/dist/$1"
         }
     ],
-    "builds": [
-        {
-            "src": "backend/server.js",
-            "use": "@vercel/node"
-        },
-        {
-            "src": "frontend/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
+    "functions": {
+        "backend/server.js": {
+            "includeFiles": "backend/**"
         }
-    ]
+    }
 }
