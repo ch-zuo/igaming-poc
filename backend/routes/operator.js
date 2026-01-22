@@ -3,6 +3,8 @@ const router = express.Router();
 const supabaseService = require('../services/supabase');
 const ftService = require('../services/ft-integration');
 
+const PLATFORM_ORIGIN = process.env.PLATFORM_ORIGIN || 'igaming-poc';
+
 // Middleware to mock authentication or extract token
 const authenticateUser = async (req, res, next) => {
     const token = req.headers['authorization']; // Expecting "Bearer <token>"
@@ -35,14 +37,16 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
     res.json({
         sid: 'session-' + req.user.id + '-' + Date.now(),
         user_id: req.user.id,
-        currency: req.user.currency
+        currency: req.user.currency,
+        origin: PLATFORM_ORIGIN
     });
 });
 
 router.get('/balance', authenticateUser, async (req, res) => {
     res.json({
         amount: req.user.balance,
-        currency: req.user.currency
+        currency: req.user.currency,
+        origin: PLATFORM_ORIGIN
     });
 });
 
@@ -113,7 +117,8 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     res.json({
         transaction_id,
         balance: newBalance,
-        currency: user.currency
+        currency: user.currency,
+        origin: PLATFORM_ORIGIN
     });
 });
 
@@ -148,7 +153,8 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     res.json({
         transaction_id,
         balance: newBalance,
-        currency: user.currency
+        currency: user.currency,
+        origin: PLATFORM_ORIGIN
     });
 });
 
@@ -170,7 +176,11 @@ router.post('/deposit', authenticateUser, async (req, res) => {
         currency: req.user.currency
     });
 
-    res.json({ balance: newBalance, currency: req.user.currency });
+    res.json({
+        balance: newBalance,
+        currency: req.user.currency,
+        origin: PLATFORM_ORIGIN
+    });
 });
 
 module.exports = router;

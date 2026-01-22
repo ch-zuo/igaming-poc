@@ -2,6 +2,7 @@ const axios = require('axios');
 
 const FT_API_URL = process.env.FT_API_URL || 'https://api.fasttrack-integration.com/v1';
 const FT_API_KEY = process.env.FT_API_KEY;
+const PLATFORM_ORIGIN = process.env.PLATFORM_ORIGIN || 'igaming-poc';
 
 // Endpoint mapping based on FT Documentation
 const EVENT_CONFIG = {
@@ -41,7 +42,7 @@ const pushEvent = async (userId, eventType, payload) => {
         console.log(`[FT Integration] Target URL: ${targetUrl} [${config.method}]`);
 
         // Refine payload based on Fast Track documentation
-        const origin = process.env.VERCEL_URL || 'igaming-poc.vercel.app';
+        const origin = PLATFORM_ORIGIN;
         const timestamp = new Date().toISOString();
 
         // Event-specific data enrichment
@@ -73,8 +74,8 @@ const pushEvent = async (userId, eventType, payload) => {
             requestBody = {
                 user_id: userId,
                 payment_id: payload.transaction_id || `tx-${Date.now()}`,
-                type: 'Deposit',
-                status: 'Approved',
+                type: 'Deposit', // Keep Deposit as type
+                status: payload.status || 'Approved', // status from requested list
                 amount: parseFloat(payload.amount),
                 currency: payload.currency || 'EUR',
                 exchange_rate: payload.exchange_rate || 1.0,
