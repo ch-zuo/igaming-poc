@@ -53,31 +53,40 @@ const pushEvent = async (userId, eventType, payload) => {
                 session_id: payload.session_id || `sess-${Date.now()}`,
                 ip_address: payload.ip_address || '127.0.0.1',
                 user_agent: payload.user_agent || 'Mozilla/5.0',
-                device_type: payload.device_type || 'Desktop'
+                device_type: payload.device_type || 'Desktop',
+                timestamp: new Date().toISOString()
             };
         } else if (eventType === 'deposit' || eventType === 'payment') {
             requestBody = {
                 user_id: userId,
                 type: 'Deposit',
                 status: 'Approved',
-                amount: payload.amount,
+                amount: parseFloat(payload.amount),
                 currency: payload.currency || 'EUR',
                 transaction_id: payload.transaction_id || `tx-${Date.now()}`,
                 provider: payload.provider || 'MockBank',
-                balance_after: payload.balance_after
+                balance_after: parseFloat(payload.balance_after),
+                timestamp: new Date().toISOString()
             };
         } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
+            // Mapping to Fast Track Casino Schema
             requestBody = {
                 user_id: userId,
-                type: eventType === 'win' ? 'Win' : 'Bet',
-                status: 'Approved',
-                game_id: payload.game_id || 'unknown',
-                game_provider: payload.game_provider || 'MockProvider',
-                transaction_id: payload.transaction_id || `ctx-${Date.now()}`,
-                amount: payload.amount,
+                activity_id: payload.transaction_id || `ctx-${Date.now()}`,
+                amount: parseFloat(payload.amount),
+                balance_after: parseFloat(payload.balance_after),
+                balance_before: parseFloat(payload.balance_after) + (eventType === 'win' ? -parseFloat(payload.amount) : parseFloat(payload.amount)),
                 currency: payload.currency || 'EUR',
-                balance_after: payload.balance_after,
-                cashtype: 'Cash'
+                game_id: payload.game_id || 'unknown',
+                game_name: payload.game_id || 'Mock Slot Game',
+                game_type: 'Slot',
+                is_round_end: true,
+                status: 'Approved',
+                type: eventType === 'win' ? 'Win' : 'Bet',
+                vendor_id: 'mock-vendor-1',
+                vendor_name: payload.game_provider || 'MockProvider',
+                timestamp: new Date().toISOString(), // .toISOString() is RFC3339 compliant (e.g., 2023-11-24T12:34:56.789Z)
+                round_id: payload.transaction_id ? `round-${payload.transaction_id}` : `round-${Date.now()}`
             };
         }
 
