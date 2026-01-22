@@ -41,52 +41,102 @@ const pushEvent = async (userId, eventType, payload) => {
         console.log(`[FT Integration] Target URL: ${targetUrl} [${config.method}]`);
 
         // Refine payload based on Fast Track documentation
-        let requestBody = {
-            user_id: userId,
-            ...payload
-        };
+        const origin = process.env.VERCEL_URL || 'igaming-poc.vercel.app';
+        const timestamp = new Date().toISOString();
 
         // Event-specific data enrichment
         if (eventType === 'login') {
             requestBody = {
                 user_id: userId,
-                session_id: payload.session_id || `sess-${Date.now()}`,
+                is_impersonated: payload.is_impersonated || false,
                 ip_address: payload.ip_address || '127.0.0.1',
                 user_agent: payload.user_agent || 'Mozilla/5.0',
-                device_type: payload.device_type || 'Desktop',
-                timestamp: new Date().toISOString()
+                timestamp: timestamp,
+                origin: origin
+            };
+        } else if (eventType === 'registration' || eventType === 'register') {
+            requestBody = {
+                user_id: userId,
+                note: payload.note || 'New user registration',
+                user_agent: payload.user_agent || 'Mozilla/5.0',
+                ip_address: payload.ip_address || '127.0.0.1',
+                timestamp: timestamp,
+                origin: origin
+            };
+        } else if (['consents', 'blocks', 'user_update'].includes(eventType)) {
+            requestBody = {
+                user_id: userId,
+                timestamp: timestamp,
+                origin: origin
             };
         } else if (eventType === 'deposit' || eventType === 'payment') {
             requestBody = {
                 user_id: userId,
+                payment_id: payload.transaction_id || `tx-${Date.now()}`,
                 type: 'Deposit',
                 status: 'Approved',
                 amount: parseFloat(payload.amount),
                 currency: payload.currency || 'EUR',
-                transaction_id: payload.transaction_id || `tx-${Date.now()}`,
-                provider: payload.provider || 'MockBank',
-                balance_after: parseFloat(payload.balance_after),
-                timestamp: new Date().toISOString()
+                exchange_rate: payload.exchange_rate || 1.0,
+                fee_amount: payload.fee_amount || 0.0,
+                vendor_id: payload.vendor_id || 'mock-bank-1',
+                vendor_name: payload.provider || 'MockBank',
+                origin: origin,
+                timestamp: timestamp
             };
         } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
-            // Mapping to Fast Track Casino Schema
             requestBody = {
                 user_id: userId,
                 activity_id: payload.transaction_id || `ctx-${Date.now()}`,
+                type: eventType === 'win' ? 'Win' : 'Bet',
+                status: 'Approved',
                 amount: parseFloat(payload.amount),
                 balance_after: parseFloat(payload.balance_after),
                 balance_before: parseFloat(payload.balance_after) + (eventType === 'win' ? -parseFloat(payload.amount) : parseFloat(payload.amount)),
                 currency: payload.currency || 'EUR',
+                exchange_rate: payload.exchange_rate || 1.0,
                 game_id: payload.game_id || 'unknown',
-                game_name: payload.game_id || 'Mock Slot Game',
-                game_type: 'Slot',
-                is_round_end: true,
-                status: 'Approved',
-                type: eventType === 'win' ? 'Win' : 'Bet',
-                vendor_id: 'mock-vendor-1',
+                game_name: payload.game_name || 'Mock Slot Game',
+                game_type: payload.game_type || 'Slot',
+                vendor_id: payload.vendor_id || 'mock-vendor-1',
                 vendor_name: payload.game_provider || 'MockProvider',
-                timestamp: new Date().toISOString(), // .toISOString() is RFC3339 compliant (e.g., 2023-11-24T12:34:56.789Z)
-                round_id: payload.transaction_id ? `round-${payload.transaction_id}` : `round-${Date.now()}`
+                round_id: payload.round_id || (payload.transaction_id ? `round-${payload.transaction_id}` : `round-${Date.now()}`),
+                is_round_end: payload.is_round_end !== undefined ? payload.is_round_end : true,
+                origin: origin,
+                timestamp: timestamp
+            };
+        } else if (eventType === 'bonus') {
+            requestBody = {
+                user_id: userId,
+                bonus_id: payload.bonus_id || '9821',
+                user_bonus_id: payload.user_bonus_id || `ub-${Date.now()}`,
+                type: payload.type || 'WelcomeBonus',
+                status: payload.status || 'Created',
+                amount: parseFloat(payload.amount),
+                currency: payload.currency || 'EUR',
+                exchange_rate: payload.exchange_rate || 1.0,
+                locked_amount: payload.locked_amount || 0.0,
+                bonus_turned_real: payload.bonus_turned_real || 0,
+                required_wagering_amount: payload.required_wagering_amount || 0.0,
+                product: payload.product || 'Casino',
+                origin: origin,
+                timestamp: timestamp,
+                meta: payload.meta || {},
+                fasttrack_references: payload.fasttrack_references || {}
+            };
+        } else if (eventType === 'balance') {
+            requestBody = {
+                user_id: userId,
+                balances: payload.balances || [
+                    {
+                        amount: parseFloat(payload.amount || 0),
+                        currency: payload.currency || 'EUR',
+                        key: 'real_money',
+                        exchange_rate: 1
+                    }
+                ],
+                origin: origin,
+                timestamp: timestamp
             };
         }
 
