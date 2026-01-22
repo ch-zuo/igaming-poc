@@ -48,18 +48,33 @@ router.get('/balance', authenticateUser, async (req, res) => {
 // The prompt said "Mock Game Provider... hits the Core Platform's casino endpoint".
 // Usually this is S2S. Let's assume a secret key check for debit/credit.
 
-const verifyGameProvider = (req, res, next) => {
+const verifyGameProviderOrUser = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
     const validKey = process.env.OPERATOR_API_KEY;
 
-    // Allow if no key configured (dev mode) or keys match
-    if (validKey && apiKey !== validKey) {
-        return res.status(401).json({ error: 'Invalid x-api-key' });
+    // 1. Check if valid API Key is provided (Server-to-Server)
+    if (validKey && apiKey === validKey) {
+        return next();
     }
-    next();
+
+    // 2. Fallback: Check for User Token (Client-side Dashboard)
+    // Reuse the logic from authenticateUser but handle the error/next flow carefully
+    const token = req.headers['authorization'];
+    const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
+
+    if (actualToken) {
+        const user = await supabaseService.getUser(actualToken);
+        if (user) {
+            req.user = user;
+            return next();
+        }
+    }
+
+    // 3. Fail if neither
+    return res.status(401).json({ error: 'Unauthorized: Invalid API Key or Token' });
 };
 
-router.post('/debit', verifyGameProvider, async (req, res) => {
+router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     const { user_id, amount, transaction_id, game_id } = req.body;
 
     if (!user_id || !amount) {
@@ -93,7 +108,7 @@ router.post('/debit', verifyGameProvider, async (req, res) => {
     });
 });
 
-router.post('/credit', verifyGameProvider, async (req, res) => {
+router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     const { user_id, amount, transaction_id, game_id } = req.body;
 
     if (!user_id || amount === undefined) {
