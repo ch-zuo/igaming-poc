@@ -35,6 +35,11 @@ const getUser = async (token) => {
     const cleanToken = token ? token.trim() : '';
     console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
 
+    // Diagnostic logs for environment variables
+    console.log('[Supabase Diagnostic] process.env keys:', Object.keys(process.env).filter(k => k.startsWith('SUPABASE') || k.startsWith('FT_')));
+    console.log('[Supabase Diagnostic] SUPABASE_URL present:', !!process.env.SUPABASE_URL);
+    console.log('[Supabase Diagnostic] SUPABASE_ANON_KEY present:', !!process.env.SUPABASE_ANON_KEY);
+
     if (supabase) {
         console.log('[Supabase] Using Supabase Client');
         // Look up custom 'users' table by token
