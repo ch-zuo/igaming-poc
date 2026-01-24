@@ -18,14 +18,31 @@ const mockDB = {
     users: new Map([
         ['test-user', {
             id: 'test-user',
+            user_id: 'test-user',
             username: 'Test User',
             balance: 1000,
             currency: 'EUR',
             token: 'valid-token',
             country: 'MT',
+            language: 'en',
             first_name: 'John',
             last_name: 'Doe',
-            email: 'test-user@example.com'
+            email: 'test-user@example.com',
+            address: 'Tower Road, 120A',
+            birth_date: '1990-01-01',
+            city: 'Sliema',
+            mobile: '21435678',
+            mobile_prefix: '+356',
+            registration_date: '2023-01-01T08:00:00Z',
+            postal_code: 'SLM 1030',
+            sex: 'Male',
+            title: 'Mr',
+            is_blocked: false,
+            is_excluded: false,
+            market: 'gb',
+            roles: ["VIP", "TEST_USER"],
+            registration_code: "ABC123",
+            verified_at: "2023-01-01T08:00:00Z"
         }]
     ]),
 };

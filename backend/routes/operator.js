@@ -197,14 +197,34 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
     }
 
     res.json({
-        user_id: user.id,
-        currency: user.currency,
-        balance: user.balance,
-        country: user.country || 'MT',
+        user_id: user.user_id || user.id,
+        username: user.username || `user_${user.id}`,
         first_name: user.first_name || 'John',
         last_name: user.last_name || 'Doe',
         email: user.email || `${user.id}@example.com`,
-        origin: PLATFORM_ORIGIN
+        address: user.address || 'Tower Road, 120A',
+        city: user.city || 'Sliema',
+        country: user.country || 'MT',
+        postal_code: user.postal_code || 'SLM 1030',
+        language: user.language || 'en',
+        currency: user.currency || 'EUR',
+        birth_date: user.birth_date || '1990-01-01',
+        registration_date: user.registration_date || '2023-01-01T08:00:00Z',
+        mobile: user.mobile || '21435678',
+        mobile_prefix: user.mobile_prefix || '+356',
+        sex: user.sex || 'Male',
+        title: user.title || 'Mr',
+        is_blocked: user.is_blocked || false,
+        is_excluded: user.is_excluded || false,
+        market: user.market || 'gb',
+        origin: user.origin || PLATFORM_ORIGIN,
+        roles: user.roles || ["VIP", "TEST_USER"],
+        registration_code: user.registration_code || "ABC123",
+        verified_at: user.verified_at || '2023-01-01T08:00:00Z',
+        segmentation: user.segmentation || {
+            vip_level: 1,
+            special_segmentation: "PoC"
+        }
     });
 });
 
@@ -213,8 +233,21 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
  * Returns player account blocks (mocked for PoC).
  */
 router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => {
-    // For PoC, we return an empty array (no blocks)
-    res.json([]);
+    // For PoC, we return a compliant blocks object
+    res.json({
+        blocks: [
+            {
+                active: false,
+                type: "Excluded",
+                note: "Not excluded in PoC"
+            },
+            {
+                active: false,
+                type: "Blocked",
+                note: "Not blocked in PoC"
+            }
+        ]
+    });
 });
 
 /**
@@ -222,11 +255,32 @@ router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => 
  * Returns marketing/data consents (mocked for PoC).
  */
 router.get('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) => {
-    // For PoC, we return standard marketing consents
-    res.json([
-        { id: 'marketing_email', name: 'Email Marketing', value: true },
-        { id: 'marketing_sms', name: 'SMS Marketing', value: false }
-    ]);
+    // For PoC, we return standard marketing consents in compliant object format
+    res.json({
+        consents: [
+            { opted_in: true, type: 'email' },
+            { opted_in: true, type: 'sms' },
+            { opted_in: false, type: 'telephone' },
+            { opted_in: true, type: 'postMail' },
+            { opted_in: true, type: 'siteNotification' },
+            { opted_in: true, type: 'pushNotification' }
+        ]
+    });
+});
+
+/**
+ * 3.5 POST /userconsents/:userid
+ * Receives consent updates from FT.
+ */
+router.post('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) => {
+    const { userid } = req.params;
+    const { consents } = req.body;
+
+    console.log(`[Operator API] Consents updated for user ${userid}:`, consents);
+
+    // In dynamic PoC, we would update the DB here.
+    // For now, we acknowledge success.
+    res.json({ status: 'success', origin: PLATFORM_ORIGIN });
 });
 
 /**
