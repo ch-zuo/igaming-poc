@@ -220,6 +220,7 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
         origin: user.origin || PLATFORM_ORIGIN,
         roles: user.roles || ["VIP", "TEST_USER"],
         registration_code: user.registration_code || "ABC123",
+        affiliate_reference: user.affiliate_reference || "AFF_DEFAULT",
         verified_at: user.verified_at || '2023-01-01T08:00:00Z',
         segmentation: user.segmentation || {
             vip_level: 1,

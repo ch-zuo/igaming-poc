@@ -42,7 +42,8 @@ const mockDB = {
             market: 'gb',
             roles: ["VIP", "TEST_USER"],
             registration_code: "ABC123",
-            verified_at: "2023-01-01T08:00:00Z"
+            verified_at: "2023-01-01T08:00:00Z",
+            affiliate_reference: "AFF_1234A_UK"
         }]
     ]),
 };
