@@ -42,87 +42,6 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
     });
 });
 
-// 1. Registrations
-router.post('/register', async (req, res) => {
-    const { user_id, email, currency } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
-
-    // In a real app, we would create the user in Supabase here.
-    // For the PoC, we just trigger the FT event.
-    await ftService.pushEvent(user_id, 'register', {
-        note: `New user registration: ${email || user_id}`,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent']
-    });
-
-    res.json({
-        message: 'User registered (PoC)',
-        user_id,
-        origin: PLATFORM_ORIGIN
-    });
-});
-
-// 2. User Consents
-router.post('/user/consents', authenticateUser, async (req, res) => {
-    await ftService.pushEvent(req.user.id, 'consents', {
-        timestamp: new Date().toISOString()
-    });
-
-    res.json({
-        message: 'Consents updated',
-        user_id: req.user.id,
-        origin: PLATFORM_ORIGIN
-    });
-});
-
-// 3. User Blocks
-router.post('/user/blocks', authenticateUser, async (req, res) => {
-    const { blocked } = req.body; // boolean
-    await ftService.pushEvent(req.user.id, 'blocks', {
-        status: blocked ? 'Blocked' : 'Unblocked',
-        timestamp: new Date().toISOString()
-    });
-
-    res.json({
-        message: `User ${blocked ? 'blocked' : 'unblocked'}`,
-        user_id: req.user.id,
-        origin: PLATFORM_ORIGIN
-    });
-});
-
-// 4. User Updates
-router.post('/user/update', authenticateUser, async (req, res) => {
-    const { first_name, last_name } = req.body;
-    await ftService.pushEvent(req.user.id, 'user_update', {
-        first_name,
-        last_name,
-        timestamp: new Date().toISOString()
-    });
-
-    res.json({
-        message: 'User profile updated',
-        user_id: req.user.id,
-        origin: PLATFORM_ORIGIN
-    });
-});
-
-// 5. Bonus
-router.post('/bonus', authenticateUser, async (req, res) => {
-    const { bonus_id, amount } = req.body;
-    await ftService.pushEvent(req.user.id, 'bonus', {
-        bonus_id: bonus_id || 'WELCOME_POC',
-        amount: parseFloat(amount || 50),
-        currency: req.user.currency,
-        status: 'Created'
-    });
-
-    res.json({
-        message: 'Bonus awarded',
-        user_id: req.user.id,
-        origin: PLATFORM_ORIGIN
-    });
-});
-
 router.get('/balance', authenticateUser, async (req, res) => {
     res.json({
         amount: req.user.balance,
@@ -260,6 +179,95 @@ router.post('/deposit', authenticateUser, async (req, res) => {
     res.json({
         balance: newBalance,
         currency: req.user.currency,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+/**
+ * 1. GET /userdetails/:userid
+ * Returns user profile, balance, and currency.
+ * Used by FT to verify user data on login or session start.
+ */
+router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) => {
+    const { userid } = req.params;
+    const user = await supabaseService.getUserById(userid);
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+        user_id: user.id,
+        currency: user.currency,
+        balance: user.balance,
+        country: user.country || 'MT',
+        first_name: user.first_name || 'John',
+        last_name: user.last_name || 'Doe',
+        email: user.email || `${user.id}@example.com`,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+/**
+ * 2. GET /userblocks/:userid
+ * Returns player account blocks (mocked for PoC).
+ */
+router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => {
+    // For PoC, we return an empty array (no blocks)
+    res.json([]);
+});
+
+/**
+ * 3. GET /userconsents/:userid
+ * Returns marketing/data consents (mocked for PoC).
+ */
+router.get('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) => {
+    // For PoC, we return standard marketing consents
+    res.json([
+        { id: 'marketing_email', name: 'Email Marketing', value: true },
+        { id: 'marketing_sms', name: 'SMS Marketing', value: false }
+    ]);
+});
+
+/**
+ * 4. POST /bonus/credit
+ * Processes bonus crediting from FT.
+ */
+router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
+    const { user_id, amount, reward_id, transaction_id } = req.body;
+
+    if (!user_id || amount === undefined) {
+        return res.status(400).json({ error: 'Missing user_id or amount' });
+    }
+
+    const user = await supabaseService.getUserById(user_id);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newBalance = user.balance + parseFloat(amount);
+    await supabaseService.updateBalance(user.id, newBalance);
+
+    // Push 'bonus' event back to FT to confirm
+    await ftService.pushEvent(user.id, 'bonus', {
+        amount: amount,
+        bonus_id: reward_id,
+        transaction_id: transaction_id || `ft-bonus-${Date.now()}`,
+        status: 'Created',
+        type: 'Reward',
+        currency: user.currency
+    });
+
+    // Also sync balance
+    await ftService.pushEvent(user.id, 'balance', {
+        amount: newBalance,
+        currency: user.currency
+    });
+
+    res.json({
+        transaction_id: transaction_id || `platform-bonus-${Date.now()}`,
+        balance: newBalance,
+        currency: user.currency,
         origin: PLATFORM_ORIGIN
     });
 });
