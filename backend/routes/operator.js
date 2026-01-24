@@ -42,6 +42,87 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
     });
 });
 
+// 1. Registrations
+router.post('/register', async (req, res) => {
+    const { user_id, email, currency } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
+
+    // In a real app, we would create the user in Supabase here.
+    // For the PoC, we just trigger the FT event.
+    await ftService.pushEvent(user_id, 'register', {
+        note: `New user registration: ${email || user_id}`,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
+    });
+
+    res.json({
+        message: 'User registered (PoC)',
+        user_id,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+// 2. User Consents
+router.post('/user/consents', authenticateUser, async (req, res) => {
+    await ftService.pushEvent(req.user.id, 'consents', {
+        timestamp: new Date().toISOString()
+    });
+
+    res.json({
+        message: 'Consents updated',
+        user_id: req.user.id,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+// 3. User Blocks
+router.post('/user/blocks', authenticateUser, async (req, res) => {
+    const { blocked } = req.body; // boolean
+    await ftService.pushEvent(req.user.id, 'blocks', {
+        status: blocked ? 'Blocked' : 'Unblocked',
+        timestamp: new Date().toISOString()
+    });
+
+    res.json({
+        message: `User ${blocked ? 'blocked' : 'unblocked'}`,
+        user_id: req.user.id,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+// 4. User Updates
+router.post('/user/update', authenticateUser, async (req, res) => {
+    const { first_name, last_name } = req.body;
+    await ftService.pushEvent(req.user.id, 'user_update', {
+        first_name,
+        last_name,
+        timestamp: new Date().toISOString()
+    });
+
+    res.json({
+        message: 'User profile updated',
+        user_id: req.user.id,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
+// 5. Bonus
+router.post('/bonus', authenticateUser, async (req, res) => {
+    const { bonus_id, amount } = req.body;
+    await ftService.pushEvent(req.user.id, 'bonus', {
+        bonus_id: bonus_id || 'WELCOME_POC',
+        amount: parseFloat(amount || 50),
+        currency: req.user.currency,
+        status: 'Created'
+    });
+
+    res.json({
+        message: 'Bonus awarded',
+        user_id: req.user.id,
+        origin: PLATFORM_ORIGIN
+    });
+});
+
 router.get('/balance', authenticateUser, async (req, res) => {
     res.json({
         amount: req.user.balance,
