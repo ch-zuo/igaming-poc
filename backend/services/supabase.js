@@ -32,12 +32,16 @@ if (supabaseUrl && supabaseKey) {
 }
 
 const getUser = async (token) => {
+    const cleanToken = token ? token.trim() : '';
+    console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
+
     if (supabase) {
+        console.log('[Supabase] Using Supabase Client');
         // Look up custom 'users' table by token
         const { data, error: dbError } = await supabase
             .from('users')
             .select('*')
-            .eq('token', token)
+            .eq('token', cleanToken)
             .single();
 
         if (data) return data;
@@ -52,9 +56,10 @@ const getUser = async (token) => {
 
         return null;
     } else {
+        console.warn('[Auth] Supabase client not initialized. Falling back to Mock DB.');
         // Mock lookup
         for (const user of mockDB.users.values()) {
-            if (user.token === token) return user;
+            if (user.token === cleanToken) return user;
         }
         return null;
     }

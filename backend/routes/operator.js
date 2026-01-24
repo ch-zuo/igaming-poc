@@ -7,10 +7,10 @@ const PLATFORM_ORIGIN = process.env.PLATFORM_ORIGIN || 'igaming-poc';
 
 // Middleware to mock authentication or extract token
 const authenticateUser = async (req, res, next) => {
-    const token = req.headers['authorization']; // Expecting "Bearer <token>"
-
-    // For simplicity in this PoC, we might accept just the token string or Bearer
+    const token = req.headers['authorization'];
     const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
+
+    console.log(`[Middleware] Extracted Token: "${actualToken ? actualToken.substring(0, 5) : 'null'}..."`);
 
     if (!actualToken) {
         return res.status(401).json({ error: 'No token provided' });
