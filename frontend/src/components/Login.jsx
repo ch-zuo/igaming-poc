@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 function Login({ onLogin }) {
-    const [token, setToken] = useState('valid-token');
+    const [token, setToken] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
