@@ -75,8 +75,9 @@ const pushEvent = async (userId, eventType, payload) => {
             requestBody = {
                 user_id: userId,
                 payment_id: payload.transaction_id || `tx-${Date.now()}`,
-                type: 'Deposit', // Keep Deposit as type
-                status: payload.status || 'Approved', // status from requested list
+                type: 'Credit', // Fast Track expects 'Credit' for Deposits
+                status: payload.status || 'Approved', // Requested, Approved, Rejected, Rollback, Cancelled
+                cashtype: 'cash',
                 amount: parseFloat(payload.amount),
                 currency: payload.currency || 'EUR',
                 exchange_rate: payload.exchange_rate || 1.0,
@@ -86,6 +87,7 @@ const pushEvent = async (userId, eventType, payload) => {
                 origin: origin,
                 timestamp: timestamp
             };
+            console.log(`[FT Integration] Payment payload: ${JSON.stringify(requestBody, null, 2)}`);
         } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
             requestBody = {
                 user_id: userId,
