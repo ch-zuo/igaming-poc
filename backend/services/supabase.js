@@ -11,7 +11,17 @@ let supabase;
 // Mock DB for development if credentials are missing
 const mockDB = {
     users: new Map([
-        ['test-user', { id: 'test-user', username: 'Test User', balance: 1000, currency: 'EUR', token: 'valid-token' }]
+        ['test-user', {
+            id: 'test-user',
+            username: 'Test User',
+            balance: 1000,
+            currency: 'EUR',
+            token: 'valid-token',
+            country: 'MT',
+            first_name: 'John',
+            last_name: 'Doe',
+            email: 'test-user@example.com'
+        }]
     ]),
 };
 
@@ -23,21 +33,24 @@ if (supabaseUrl && supabaseKey) {
 
 const getUser = async (token) => {
     if (supabase) {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        // Note: This assumes standard Supabase Auth. 
-        // For this custom integration, we might look up a custom 'users' table by token if implementing custom auth.
-        // Let's assume for this PoC we check a 'users' table.
+        // Look up custom 'users' table by token
         const { data, error: dbError } = await supabase
             .from('users')
             .select('*')
             .eq('token', token)
             .single();
 
-        if (dbError) {
-            console.error('[Supabase] Error fetching user:', dbError);
+        if (data) return data;
+
+        // Fallback to Supabase Auth only if table lookup fails
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser(token);
+            if (user) return user;
+        } catch (e) {
+            // Ignore auth errors if token is not a JWT
         }
-        if (dbError || !data) return null;
-        return data;
+
+        return null;
     } else {
         // Mock lookup
         for (const user of mockDB.users.values()) {
