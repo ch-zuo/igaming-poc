@@ -135,6 +135,12 @@ const pushEvent = async (userId, eventType, payload) => {
                         currency: payload.currency || 'EUR',
                         key: 'real_money',
                         exchange_rate: 1
+                    },
+                    {
+                        amount: parseFloat(payload.bonus_amount || 0),
+                        currency: payload.currency || 'EUR',
+                        key: 'bonus_money',
+                        exchange_rate: 1
                     }
                 ],
                 origin: origin,
