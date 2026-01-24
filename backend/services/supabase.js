@@ -6,6 +6,11 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+// Top-level diagnostics for Vercel
+console.log('[Supabase Init] SUPABASE_URL length:', supabaseUrl ? supabaseUrl.length : 'undefined');
+console.log('[Supabase Init] SUPABASE_ANON_KEY length:', supabaseKey ? supabaseKey.length : 'undefined');
+console.log('[Supabase Init] All ENV keys starting with SUPA:', Object.keys(process.env).filter(k => k.startsWith('SUPA')));
+
 let supabase;
 
 // Mock DB for development if credentials are missing
@@ -26,19 +31,15 @@ const mockDB = {
 };
 
 if (supabaseUrl && supabaseKey) {
+    console.log('[Supabase Init] Initializing Supabase Client...');
     supabase = createClient(supabaseUrl, supabaseKey);
 } else {
-    console.warn('Supabase credentials not found. Using Mock DB.');
+    console.warn('[Supabase Init] Supabase credentials not found. Falling back to Mock DB.');
 }
 
 const getUser = async (token) => {
     const cleanToken = token ? token.trim() : '';
     console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
-
-    // Diagnostic logs for environment variables
-    console.log('[Supabase Diagnostic] process.env keys:', Object.keys(process.env).filter(k => k.startsWith('SUPABASE') || k.startsWith('FT_')));
-    console.log('[Supabase Diagnostic] SUPABASE_URL present:', !!process.env.SUPABASE_URL);
-    console.log('[Supabase Diagnostic] SUPABASE_ANON_KEY present:', !!process.env.SUPABASE_ANON_KEY);
 
     if (supabase) {
         console.log('[Supabase] Using Supabase Client');
