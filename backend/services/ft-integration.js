@@ -44,6 +44,7 @@ const pushEvent = async (userId, eventType, payload) => {
         // Refine payload based on Fast Track documentation
         const origin = PLATFORM_ORIGIN;
         const timestamp = new Date().toISOString();
+        let requestBody = {};
 
         // Event-specific data enrichment
         if (eventType === 'login') {
