@@ -8,20 +8,32 @@ const PLATFORM_ORIGIN = process.env.PLATFORM_ORIGIN || 'igaming-poc';
 // Middleware to mock authentication or extract token
 const authenticateUser = async (req, res, next) => {
     const token = req.headers['authorization'];
-    const username = req.headers['x-username'] || req.body.username;
+    const xUsername = req.headers['x-username'];
+    const bodyUsername = req.body ? req.body.username : undefined;
+    const username = xUsername || bodyUsername;
     const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
 
-    console.log(`[Middleware] Auth Attempt for: ${username} | Token: "${actualToken ? actualToken.substring(0, 5) : 'null'}..."`);
+    console.log(`[Middleware] Auth Attempt:
+        Path: ${req.path}
+        Method: ${req.method}
+        Token: "${actualToken ? actualToken.substring(0, 10) + '...' : 'null'}"
+        Header X-Username: "${xUsername}"
+        Body Username: "${bodyUsername}"
+        Final Username: "${username}"
+    `);
 
     if (!actualToken) {
+        console.log('[Middleware] Fail: No token provided');
         return res.status(401).json({ error: 'No token provided' });
     }
 
     const user = await supabaseService.getUser(username, actualToken);
     if (!user) {
+        console.log(`[Middleware] Fail: User not found for token: ${actualToken.substring(0, 10)}... and username: ${username}`);
         return res.status(401).json({ error: 'Invalid username or token' });
     }
 
+    console.log(`[Middleware] Success: User ${user.username || user.id} authenticated`);
     req.user = user;
     next();
 };
@@ -72,7 +84,7 @@ const verifyGameProviderOrUser = async (req, res, next) => {
     const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
 
     if (actualToken) {
-        const user = await supabaseService.getUser(actualToken);
+        const user = await supabaseService.getUser(null, actualToken);
         if (user) {
             req.user = user;
             return next();

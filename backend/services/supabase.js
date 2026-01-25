@@ -58,36 +58,52 @@ if (supabaseUrl && supabaseKey) {
 
 const getUser = async (username, token) => {
     const cleanToken = token ? token.trim() : '';
-    console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
+    const cleanUsername = username ? username.trim().toLowerCase() : '';
+
+    console.log(`[Supabase Service] getUser Attempt:
+        Username: "${cleanUsername}"
+        Token: "${cleanToken.substring(0, 10)}..."
+    `);
 
     // 1. Check Mock DB first for PoC/Testing
-    const cleanUsername = username ? username.trim().toLowerCase() : '';
-    console.log(`[Auth] Attempting login for username: "${cleanUsername}" with token: "${cleanToken.substring(0, 5)}..."`);
-
     for (const user of mockDB.users.values()) {
         if (user.token === cleanToken && user.username.toLowerCase() === cleanUsername) {
-            console.log('[Auth] Mock user found');
+            console.log('[Supabase Service] Success: Found in Mock DB');
             return user;
         }
     }
 
     // 2. Fallback to Supabase if initialized
     if (supabase) {
-        console.log('[Supabase] Using Supabase Client');
+        console.log('[Supabase Service] Querying Supabase users table...');
         const { data, error: dbError } = await supabase
             .from('users')
             .select('*')
             .eq('token', cleanToken)
             .single();
 
-        if (data) return data;
+        if (dbError) {
+            console.log(`[Supabase Service] DB Error or No Row found by token: ${dbError.message}`);
+        }
 
+        if (data) {
+            console.log(`[Supabase Service] Success: Found in Supabase table. Username in DB: ${data.username}`);
+            return data;
+        }
+
+        console.log('[Supabase Service] Row not found in users table. Trying Supabase Auth fallback...');
         try {
             const { data: { user }, error } = await supabase.auth.getUser(token);
-            if (user) return user;
-        } catch (e) { }
+            if (user) {
+                console.log('[Supabase Service] Success: Found via Supabase Auth');
+                return user;
+            }
+        } catch (e) {
+            console.log(`[Supabase Service] Auth fallback error: ${e.message}`);
+        }
     }
 
+    console.log('[Supabase Service] Fail: User not found in Mock DB, Supabase table, or Auth fallback');
     return null;
 };
 

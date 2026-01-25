@@ -9,16 +9,10 @@ function App() {
   const [token, setToken] = useState(null);
   const [error, setError] = useState('');
 
-  const handleLogin = async (inputToken) => {
-    try {
-      const userData = await login(inputToken);
-      setUser(userData);
-      setToken(inputToken);
-      setError('');
-    } catch (err) {
-      setError('Login Failed. Check console/backend.');
-      console.error(err);
-    }
+  const handleLogin = (token, userData) => {
+    setUser(userData);
+    setToken(token);
+    setError('');
   };
 
   const handleLogout = () => {

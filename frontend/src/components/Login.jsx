@@ -57,14 +57,14 @@ function Login({ onLogin }) {
 
                 <div className="auth-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
                     <button
-                        className={`btn - tab ${activeTab === 'login' ? 'active' : ''} `}
+                        className={`btn-tab ${activeTab === 'login' ? 'active' : ''}`}
                         onClick={() => setActiveTab('login')}
                         style={{ flex: 1, padding: '12px', background: activeTab === 'login' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: activeTab === 'login' ? 'var(--bg-dark)' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                     >
                         SIGN IN
                     </button>
                     <button
-                        className={`btn - tab ${activeTab === 'signup' ? 'active' : ''} `}
+                        className={`btn-tab ${activeTab === 'signup' ? 'active' : ''}`}
                         onClick={() => setActiveTab('signup')}
                         style={{ flex: 1, padding: '12px', background: activeTab === 'signup' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: activeTab === 'signup' ? 'var(--bg-dark)' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                     >
