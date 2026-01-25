@@ -67,6 +67,18 @@ function Dashboard({ user, token, onLogout }) {
         }
     };
 
+    const handleToggleBlock = async () => {
+        try {
+            await axios.put('/api/userblocks/' + user.user_id, {
+                timestamp: new Date().toISOString(),
+                origin: 'igaming-poc'
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            setStatus('Player Block event simulated');
+        } catch (err) {
+            setStatus('Block simulation failed');
+        }
+    };
+
     const handleSimulateRegistration = async () => {
         try {
             // We use a backend endpoint that proxies to ftService.pushEvent(..., 'registration')
@@ -139,8 +151,11 @@ function Dashboard({ user, token, onLogout }) {
                         <button onClick={handleToggleConsent} style={{ marginRight: '5px' }}>
                             Toggle Marketing: {marketingOpted ? 'ON' : 'OFF'}
                         </button>
-                        <button onClick={handleSimulateRegistration}>
-                            Simulate Reg Event
+                        <button onClick={handleSimulateRegistration} style={{ marginRight: '5px' }}>
+                            Simulate Reg
+                        </button>
+                        <button onClick={handleToggleBlock}>
+                            Simulate Block
                         </button>
                     </div>
 

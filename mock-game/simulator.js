@@ -9,7 +9,8 @@ const BET_AMOUNT = 10;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const runSimulation = async () => {
-    console.log('--- Starting Game Simulation ---');
+    console.log('--- Starting Compliant Game Simulation ---');
+    console.log('Mode: Ready for Fast Track v1/v2 Events');
     console.log(`User: ${USER_ID}, Rounds: ${ROUNDS}`);
 
     try {
