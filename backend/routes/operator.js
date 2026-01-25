@@ -286,10 +286,67 @@ router.post('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) 
 
 /**
  * 4. POST /bonus/credit
- * Processes bonus crediting from FT.
+ * Processes bonus code-based crediting from FT.
  */
 router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
-    const { user_id, amount, reward_id, transaction_id } = req.body;
+    const { user_id, bonus_code } = req.body;
+
+    if (!user_id || !bonus_code) {
+        return res.status(400).json({ error: 'Missing user_id or bonus_code' });
+    }
+
+    const user = await supabaseService.getUserById(user_id);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // In dynamic PoC, validate bonus_code...
+    // For now, we assume fixed $10 reward for any valid code
+    const bonusAmount = 10.0;
+    const newBalance = user.balance + bonusAmount;
+    await supabaseService.updateBalance(user.id, newBalance);
+
+    // Push 'bonus' event back to FT
+    await ftService.pushEvent(user.id, 'bonus', {
+        amount: bonusAmount,
+        bonus_code: bonus_code,
+        bonus_id: 'POC-BONUS-101',
+        status: 'Created',
+        type: 'WelcomeBonus',
+        currency: user.currency
+    });
+
+    // Sync balance
+    await ftService.pushEvent(user.id, 'balance', {
+        amount: newBalance,
+        currency: user.currency
+    });
+
+    res.status(200).send('OK');
+});
+
+/**
+ * 5. GET /bonus/list
+ * Returns list of available bonuses for FT to display.
+ */
+router.get('/bonus/list', verifyGameProviderOrUser, async (req, res) => {
+    res.json({
+        "Data": [
+            { "text": "Welcome Bonus 100%", "value": "WELCOME100" },
+            { "text": "Free Spin Reward", "value": "FREESPIN20" },
+            { "text": "Loyalty Credit", "value": "LOYALTY-VAL" }
+        ],
+        "Success": true,
+        "Errors": []
+    });
+});
+
+/**
+ * 6. POST /bonus/credit/funds
+ * Processes specific monetary bonus crediting from FT.
+ */
+router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) => {
+    const { user_id, bonus_code, amount, currency } = req.body;
 
     if (!user_id || amount === undefined) {
         return res.status(400).json({ error: 'Missing user_id or amount' });
@@ -300,31 +357,27 @@ router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
+    // Note: Currency conversion could happen here if currency !== user.currency
     const newBalance = user.balance + parseFloat(amount);
     await supabaseService.updateBalance(user.id, newBalance);
 
-    // Push 'bonus' event back to FT to confirm
+    // Push 'bonus' event
     await ftService.pushEvent(user.id, 'bonus', {
         amount: amount,
-        bonus_id: reward_id,
-        transaction_id: transaction_id || `ft-bonus-${Date.now()}`,
+        bonus_code: bonus_code || 'FUNDS-REWARD',
+        bonus_id: 'POC-FUNDS-REWARD',
         status: 'Created',
-        type: 'Reward',
-        currency: user.currency
+        type: 'ReloadBonus',
+        currency: currency || user.currency
     });
 
-    // Also sync balance
+    // Sync balance
     await ftService.pushEvent(user.id, 'balance', {
         amount: newBalance,
         currency: user.currency
     });
 
-    res.json({
-        transaction_id: transaction_id || `platform-bonus-${Date.now()}`,
-        balance: newBalance,
-        currency: user.currency,
-        origin: PLATFORM_ORIGIN
-    });
+    res.status(200).send('OK');
 });
 
 module.exports = router;

@@ -40,12 +40,29 @@ export const placeBet = async (token, userId, amount) => {
     return response.data;
 };
 
-export const winPrize = async (token, userId, amount) => {
-    const response = await axios.post(`${API_URL}/credit`, {
+export const getBonusList = async (token) => {
+    const response = await axios.get(`${API_URL}/bonus/list`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const creditBonus = async (token, userId, bonusCode) => {
+    const response = await axios.post(`${API_URL}/bonus/credit`, {
+        user_id: userId,
+        bonus_code: bonusCode
+    }, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const creditBonusFunds = async (token, userId, amount, bonusCode) => {
+    const response = await axios.post(`${API_URL}/bonus/credit/funds`, {
         user_id: userId,
         amount,
-        transaction_id: `tx-${Date.now()}`,
-        game_id: 'slot-game-1'
+        bonus_code: bonusCode,
+        currency: 'EUR'
     }, {
         headers: { Authorization: `Bearer ${token}` }
     });

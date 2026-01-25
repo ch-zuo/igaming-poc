@@ -9,6 +9,8 @@ const EVENT_CONFIG = {
     'login': { path: '/v2/integration/login', method: 'POST' },
     'consents': { path: '/v2/integration/user/consents', method: 'PUT' },
     'blocks': { path: '/v2/integration/user/blocks', method: 'PUT' },
+    'registration': { path: '/v2/integration/user', method: 'POST' },
+    'register': { path: '/v2/integration/user', method: 'POST' },
     'user_update': { path: '/v2/integration/user', method: 'PUT' }, // 'User Updates'
     'payment': { path: '/v1/integration/payment', method: 'POST' },
     'casino': { path: '/v1/integration/casino', method: 'POST' },
@@ -62,10 +64,22 @@ const pushEvent = async (userId, eventType, payload) => {
                 note: payload.note || 'New user registration',
                 user_agent: payload.user_agent || 'Mozilla/5.0',
                 ip_address: payload.ip_address || '127.0.0.1',
+                timestamp: timestamp, // already ISO/RFC3339
+                origin: origin
+            };
+        } else if (eventType === 'consents') {
+            requestBody = {
+                user_id: userId,
                 timestamp: timestamp,
                 origin: origin
             };
-        } else if (['consents', 'blocks', 'user_update'].includes(eventType)) {
+        } else if (eventType === 'blocks') {
+            requestBody = {
+                user_id: userId,
+                timestamp: timestamp,
+                origin: origin
+            };
+        } else if (eventType === 'user_update') {
             requestBody = {
                 user_id: userId,
                 timestamp: timestamp,
@@ -113,16 +127,17 @@ const pushEvent = async (userId, eventType, payload) => {
             requestBody = {
                 user_id: userId,
                 bonus_id: payload.bonus_id || '9821',
-                user_bonus_id: payload.user_bonus_id || `ub-${Date.now()}`,
-                type: payload.type || 'WelcomeBonus',
-                status: payload.status || 'Created',
-                amount: parseFloat(payload.amount),
+                user_bonus_id: payload.user_bonus_id || `${userId}-${payload.bonus_id || '9821'}`,
+                type: payload.type || 'WelcomeBonus', // NoDeposit, WelcomeBonus, CashbackBonus, etc.
+                status: payload.status || 'Created', // Pending, Created, Ongoing, Completed, etc.
+                amount: parseFloat(payload.amount || 0),
+                bonus_code: payload.bonus_code || 'WELCOME100',
                 currency: payload.currency || 'EUR',
                 exchange_rate: payload.exchange_rate || 1.0,
-                locked_amount: payload.locked_amount || 0.0,
-                bonus_turned_real: payload.bonus_turned_real || 0,
-                required_wagering_amount: payload.required_wagering_amount || 0.0,
-                product: payload.product || 'Casino',
+                locked_amount: parseFloat(payload.locked_amount || 0.0),
+                bonus_turned_real: parseFloat(payload.bonus_turned_real || 0.0),
+                required_wagering_amount: parseFloat(payload.required_wagering_amount || 0.0),
+                product: payload.product || 'Casino', // Casino, Sportsbook, Lotto, Poker
                 origin: origin,
                 timestamp: timestamp,
                 meta: payload.meta || {},
