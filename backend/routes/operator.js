@@ -109,12 +109,32 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.balance < amount) {
+    const totalBalance = (user.balance || 0) + (user.bonus_balance || 0);
+
+    if (totalBalance < amount) {
         return res.status(402).json({ error: 'Insufficient funds' });
     }
 
-    const newBalance = user.balance - amount;
-    await supabaseService.updateBalance(user.id, newBalance);
+    let remainingDebit = amount;
+    let newBonusBalance = user.bonus_balance || 0;
+    let newBalance = user.balance || 0;
+
+    // 1. Deduct from Bonus Wallet first
+    if (newBonusBalance > 0) {
+        const bonusDeduction = Math.min(newBonusBalance, remainingDebit);
+        newBonusBalance -= bonusDeduction;
+        remainingDebit -= bonusDeduction;
+    }
+
+    // 2. Deduct remaining from Real Wallet
+    if (remainingDebit > 0) {
+        newBalance -= remainingDebit;
+    }
+
+    await supabaseService.updateUser(user.id, {
+        balance: newBalance,
+        bonus_balance: newBonusBalance
+    });
 
     // Push bet and balance events
     await ftService.pushEvent(user.id, 'bet', {
@@ -122,16 +142,20 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
         transaction_id,
         game_id,
         balance_after: newBalance,
+        bonus_balance_after: newBonusBalance,
         currency: user.currency
     });
+
     await ftService.pushEvent(user.id, 'balance', {
         amount: newBalance,
+        bonus_amount: newBonusBalance,
         currency: user.currency
     });
 
     res.json({
         transaction_id,
         balance: newBalance,
+        bonus_balance: newBonusBalance,
         currency: user.currency,
         origin: PLATFORM_ORIGIN
     });
@@ -149,8 +173,11 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
+    // Wins always go to Real balance
     const newBalance = user.balance + amount;
-    await supabaseService.updateBalance(user.id, newBalance);
+    const currentBonusBalance = user.bonus_balance || 0;
+
+    await supabaseService.updateUser(user.id, { balance: newBalance });
 
     // Push win and balance events
     await ftService.pushEvent(user.id, 'win', {
@@ -158,16 +185,20 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
         transaction_id,
         game_id,
         balance_after: newBalance,
+        bonus_balance_after: currentBonusBalance,
         currency: user.currency
     });
+
     await ftService.pushEvent(user.id, 'balance', {
         amount: newBalance,
+        bonus_amount: currentBonusBalance,
         currency: user.currency
     });
 
     res.json({
         transaction_id,
         balance: newBalance,
+        bonus_balance: currentBonusBalance,
         currency: user.currency,
         origin: PLATFORM_ORIGIN
     });

@@ -109,14 +109,20 @@ const pushEvent = async (userId, eventType, payload) => {
             };
             console.log(`[FT Integration] Payment payload: ${JSON.stringify(requestBody, null, 2)}`);
         } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
+            const balance_after = parseFloat(payload.balance_after);
+            const balance_before = parseFloat(payload.balance_after) + (eventType === 'win' ? -parseFloat(payload.amount) : parseFloat(payload.amount));
+            const bonus_balance_after = parseFloat(payload.bonus_balance_after || 0);
+
             requestBody = {
                 user_id: userId,
                 activity_id: payload.transaction_id || `ctx-${Date.now()}`,
                 type: eventType === 'win' ? 'Win' : 'Bet',
                 status: 'Approved',
                 amount: parseFloat(payload.amount),
-                balance_after: parseFloat(payload.balance_after),
-                balance_before: parseFloat(payload.balance_after) + (eventType === 'win' ? -parseFloat(payload.amount) : parseFloat(payload.amount)),
+                balance_after: balance_after,
+                balance_before: balance_before,
+                bonus_balance_after: bonus_balance_after,
+                bonus_balance_before: payload.bonus_balance_before || (eventType === 'bet' ? bonus_balance_after + parseFloat(payload.amount) : bonus_balance_after), // Fallback logic
                 currency: payload.currency || 'EUR',
                 exchange_rate: payload.exchange_rate || 1.0,
                 game_id: payload.game_id || 'unknown',
