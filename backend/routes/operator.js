@@ -115,20 +115,26 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
         return res.status(402).json({ error: 'Insufficient funds' });
     }
 
+    const bonus_balance_before = user.bonus_balance || 0;
+    const balance_before = user.balance || 0;
+
     let remainingDebit = amount;
-    let newBonusBalance = user.bonus_balance || 0;
-    let newBalance = user.balance || 0;
+    let newBonusBalance = bonus_balance_before;
+    let newBalance = balance_before;
+    let bonus_wager_amount = 0;
+    let real_wager_amount = 0;
 
     // 1. Deduct from Bonus Wallet first
     if (newBonusBalance > 0) {
-        const bonusDeduction = Math.min(newBonusBalance, remainingDebit);
-        newBonusBalance -= bonusDeduction;
-        remainingDebit -= bonusDeduction;
+        bonus_wager_amount = Math.min(newBonusBalance, remainingDebit);
+        newBonusBalance -= bonus_wager_amount;
+        remainingDebit -= bonus_wager_amount;
     }
 
     // 2. Deduct remaining from Real Wallet
     if (remainingDebit > 0) {
-        newBalance -= remainingDebit;
+        real_wager_amount = remainingDebit;
+        newBalance -= real_wager_amount;
     }
 
     await supabaseService.updateUser(user.id, {
@@ -139,8 +145,12 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     // Push bet and balance events
     await ftService.pushEvent(user.id, 'bet', {
         amount,
+        bonus_wager_amount,
+        wager_amount: real_wager_amount,
         transaction_id,
         game_id,
+        balance_before: balance_before,
+        bonus_balance_before: bonus_balance_before,
         balance_after: newBalance,
         bonus_balance_after: newBonusBalance,
         currency: user.currency
@@ -184,6 +194,8 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
         amount,
         transaction_id,
         game_id,
+        balance_before: user.balance,
+        bonus_balance_before: currentBonusBalance,
         balance_after: newBalance,
         bonus_balance_after: currentBonusBalance,
         currency: user.currency

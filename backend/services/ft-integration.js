@@ -109,9 +109,14 @@ const pushEvent = async (userId, eventType, payload) => {
             };
             console.log(`[FT Integration] Payment payload: ${JSON.stringify(requestBody, null, 2)}`);
         } else if (eventType === 'bet' || eventType === 'win' || eventType === 'casino') {
-            const balance_after = parseFloat(payload.balance_after);
-            const balance_before = parseFloat(payload.balance_after) + (eventType === 'win' ? -parseFloat(payload.amount) : parseFloat(payload.amount));
+            const real_balance_after = parseFloat(payload.balance_after || 0);
             const bonus_balance_after = parseFloat(payload.bonus_balance_after || 0);
+            const real_balance_before = parseFloat(payload.balance_before || 0);
+            const bonus_balance_before = parseFloat(payload.bonus_balance_before || 0);
+
+            // Per requirement: balance before/after is TOTAL balance
+            const total_balance_before = real_balance_before + bonus_balance_before;
+            const total_balance_after = real_balance_after + bonus_balance_after;
 
             requestBody = {
                 user_id: userId,
@@ -119,10 +124,12 @@ const pushEvent = async (userId, eventType, payload) => {
                 type: eventType === 'win' ? 'Win' : 'Bet',
                 status: 'Approved',
                 amount: parseFloat(payload.amount),
-                balance_after: balance_after,
-                balance_before: balance_before,
+                bonus_wager_amount: parseFloat(payload.bonus_wager_amount || 0),
+                wager_amount: parseFloat(payload.wager_amount || 0),
+                balance_after: total_balance_after,
+                balance_before: total_balance_before,
                 bonus_balance_after: bonus_balance_after,
-                bonus_balance_before: payload.bonus_balance_before || (eventType === 'bet' ? bonus_balance_after + parseFloat(payload.amount) : bonus_balance_after), // Fallback logic
+                bonus_balance_before: bonus_balance_before,
                 currency: payload.currency || 'EUR',
                 exchange_rate: payload.exchange_rate || 1.0,
                 game_id: payload.game_id || 'unknown',
