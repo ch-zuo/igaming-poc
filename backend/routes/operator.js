@@ -247,14 +247,7 @@ router.post('/user/update', authenticateUser, async (req, res) => {
     try {
         const updatedUser = await supabaseService.updateUser(req.user.id, updates);
 
-        await ftService.pushEvent(req.user.id, 'user_update', {
-            first_name: updatedUser.first_name,
-            last_name: updatedUser.last_name,
-            email: updatedUser.email,
-            birth_date: updatedUser.birth_date,
-            country: updatedUser.country,
-            currency: updatedUser.currency
-        });
+        await ftService.pushEvent(req.user.id, 'user_update', {});
 
         res.json({ status: 'success', user: updatedUser });
     } catch (error) {

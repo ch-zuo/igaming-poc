@@ -10,8 +10,7 @@ const EVENT_CONFIG = {
     'consents': { path: '/v2/integration/user/consents', method: 'PUT' },
     'blocks': { path: '/v2/integration/user/blocks', method: 'PUT' },
     'registration': { path: '/v2/integration/user', method: 'POST' },
-    'register': { path: '/v2/integration/user', method: 'POST' },
-    'user_update': { path: '/v2/integration/user', method: 'POST' }, // 'User Updates' - Switched to POST for upsert pattern
+    'user_update': { path: '/v2/integration/user', method: 'PUT' },
     'logout': { path: '/v2/integration/logout', method: 'POST' },
     'payment': { path: '/v1/integration/payment', method: 'POST' },
     'casino': { path: '/v1/integration/casino', method: 'POST' },
