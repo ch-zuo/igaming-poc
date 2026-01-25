@@ -12,6 +12,7 @@ const EVENT_CONFIG = {
     'registration': { path: '/v2/integration/user', method: 'POST' },
     'register': { path: '/v2/integration/user', method: 'POST' },
     'user_update': { path: '/v2/integration/user', method: 'PUT' }, // 'User Updates'
+    'logout': { path: '/v2/integration/logout', method: 'POST' },
     'payment': { path: '/v1/integration/payment', method: 'POST' },
     'casino': { path: '/v1/integration/casino', method: 'POST' },
     'bonus': { path: '/v1/integration/bonus', method: 'POST' },
@@ -80,6 +81,20 @@ const pushEvent = async (userId, eventType, payload) => {
                 origin: origin
             };
         } else if (eventType === 'user_update') {
+            requestBody = {
+                user_id: userId,
+                first_name: payload.first_name,
+                last_name: payload.last_name,
+                email: payload.email,
+                birth_date: payload.birth_date,
+                country: payload.country,
+                currency: payload.currency,
+                timestamp: timestamp,
+                origin: origin
+            };
+            // Remove undefined fields to avoid sending nulls to FT if not provided
+            Object.keys(requestBody).forEach(key => requestBody[key] === undefined && delete requestBody[key]);
+        } else if (eventType === 'logout') {
             requestBody = {
                 user_id: userId,
                 timestamp: timestamp,

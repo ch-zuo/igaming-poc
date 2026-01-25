@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { getBalance, deposit, placeBet, getBonusList, creditBonus, creditBonusFunds } from '../services/api';
+import {
+    getBalance,
+    deposit,
+    placeBet,
+    getBonusList,
+    creditBonus,
+    triggerRegistration,
+    updateUser,
+    logout as apiLogout
+} from '../services/api';
 import axios from 'axios';
 
-function Dashboard({ user, token, onLogout }) {
+function Dashboard({ user: initialUser, token, onLogout }) {
+    const [user, setUser] = useState(initialUser);
     const [balance, setBalance] = useState(0);
     const [currency, setCurrency] = useState('EUR');
-    const [status, setStatus] = useState('');
+    const [status, setStatus] = useState('System ready');
     const [bonuses, setBonuses] = useState([]);
     const [marketingOpted, setMarketingOpted] = useState(true);
+
+    const [firstName, setFirstName] = useState(user.first_name || '');
+    const [lastName, setLastName] = useState(user.last_name || '');
 
     useEffect(() => {
         fetchBalance();
@@ -37,9 +50,23 @@ function Dashboard({ user, token, onLogout }) {
         try {
             const data = await deposit(token, 100);
             setBalance(data.balance);
-            setStatus('Deposited 100 ' + data.currency);
+            setStatus('Deposit Success: +100 ' + data.currency);
         } catch (err) {
             setStatus('Deposit failed');
+        }
+    };
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await updateUser(token, {
+                first_name: firstName,
+                last_name: lastName
+            });
+            setUser(res.user);
+            setStatus('Profile updated & FT event sent!');
+        } catch (err) {
+            setStatus('Profile update failed');
         }
     };
 
@@ -47,11 +74,13 @@ function Dashboard({ user, token, onLogout }) {
         try {
             const newVal = !marketingOpted;
             setMarketingOpted(newVal);
-            // Simulate triggering the 'consents' event to FT via a backend proxy or direct call if implemented
             await axios.put('/api/userconsents/' + user.user_id, {
-                consents: [{ opted_in: newVal, type: 'email' }]
+                consents: [
+                    { opted_in: newVal, type: 'email' },
+                    { opted_in: newVal, type: 'sms' }
+                ]
             }, { headers: { Authorization: `Bearer ${token}` } });
-            setStatus(`Marketing Consent set to: ${newVal}`);
+            setStatus(`Consent [FT Consents] updated: ${newVal ? 'Opted-In' : 'Opted-Out'}`);
         } catch (err) {
             setStatus('Consent update failed');
         }
@@ -70,27 +99,35 @@ function Dashboard({ user, token, onLogout }) {
     const handleToggleBlock = async () => {
         try {
             await axios.put('/api/userblocks/' + user.user_id, {
-                timestamp: new Date().toISOString(),
-                origin: 'igaming-poc'
+                blocks: [
+                    { active: true, type: 'Blocked', note: 'PoC Simulation' }
+                ]
             }, { headers: { Authorization: `Bearer ${token}` } });
-            setStatus('Player Block event simulated');
+            setStatus('Block [FT Blocks] Event Sent');
         } catch (err) {
             setStatus('Block simulation failed');
         }
     };
 
-    const handleSimulateRegistration = async () => {
+    const handleRegistrationSim = async () => {
         try {
-            // We use a backend endpoint that proxies to ftService.pushEvent(..., 'registration')
-            // For PoC, let's assume we implement a generic 'trace-event' or trigger it via a mock 'register' action
-            await axios.post('/api/authenticate', {}, { headers: { Authorization: `Bearer ${token}` } });
-            setStatus('Registration event simulated (via Login)');
+            await triggerRegistration(token);
+            setStatus('Registration [FT Registration] Event Sent');
         } catch (err) {
             setStatus('Registration simulation failed');
         }
     };
 
-    // Simple in-dashboard game simulator
+    const handleLogoutSim = async () => {
+        try {
+            await apiLogout(token);
+            setStatus('Logout [FT Logout] Event Sent');
+            setTimeout(onLogout, 1500);
+        } catch (err) {
+            setStatus('Logout simulation failed');
+        }
+    };
+
     const handlePlayRound = async () => {
         try {
             setStatus('Spinning...');
@@ -101,8 +138,6 @@ function Dashboard({ user, token, onLogout }) {
                 const isWin = Math.random() > 0.7;
                 if (isWin) {
                     const winAmount = 20;
-                    // In a real flow, the Game Provider calls the Credit endpoint.
-                    // Here we mock it via the dashboard for PoC simplicity.
                     await axios.post('/api/credit', {
                         user_id: user.user_id,
                         amount: winAmount,
@@ -111,12 +146,12 @@ function Dashboard({ user, token, onLogout }) {
                     }, { headers: { Authorization: `Bearer ${token}` } });
 
                     setBalance(b => b + winAmount);
-                    setStatus('You Won 20!');
+                    setStatus('BIG WIN: 20!');
                 } else {
                     setStatus('No Win');
                     fetchBalance();
                 }
-            }, 1000);
+            }, 800);
         } catch (err) {
             console.error(err);
             setStatus('Game Error');
@@ -126,51 +161,102 @@ function Dashboard({ user, token, onLogout }) {
     return (
         <div className="dashboard">
             <header>
-                <h1>Player Dashboard</h1>
-                <p>Welcome, {user.first_name} ({user.user_id})</p>
-                <button onClick={onLogout}>Logout</button>
+                <div>
+                    <h1 className="logo-text">NeoStrike</h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                        ID: <span style={{ color: 'var(--accent-blue)' }}>{user.user_id}</span>
+                    </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontWeight: 700 }}>{user.username}</p>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Player Status: VIP</p>
+                    </div>
+                    <button className="btn-outline" onClick={handleLogoutSim} style={{ padding: '8px 16px' }}>
+                        Logout
+                    </button>
+                </div>
             </header>
 
-            <div className="stats" style={{ background: '#f4f4f4', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-                <h2>Balance: {balance.toFixed(2)} {currency}</h2>
-                <p className="status" style={{ fontWeight: 'bold', color: '#2c3e50' }}>{status}</p>
+            <div className="hero-balance floating">
+                <label>Available Balance</label>
+                <h2>{balance.toFixed(2)} <small style={{ fontSize: '2rem' }}>{currency}</small></h2>
+                <div className="status-log">
+                    {status}
+                </div>
             </div>
 
-            <div className="action-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <section className="main-actions">
-                    <h3>Game Actions</h3>
-                    <button className="btn-primary" onClick={handleDeposit}>Deposit 100</button>
-                    <button className="btn-secondary" onClick={handlePlayRound} style={{ marginTop: '10px' }}>Play Slot (Bet 10)</button>
-                </section>
-
-                <section className="simulation-center">
-                    <h3>Simulation Center (FT Events)</h3>
-
-                    <div className="sim-box" style={{ border: '1px solid #ddd', padding: '10px', borderRadius: '5px' }}>
-                        <p><strong>Compliance & Identity</strong></p>
-                        <button onClick={handleToggleConsent} style={{ marginRight: '5px' }}>
-                            Toggle Marketing: {marketingOpted ? 'ON' : 'OFF'}
-                        </button>
-                        <button onClick={handleSimulateRegistration} style={{ marginRight: '5px' }}>
-                            Simulate Reg
-                        </button>
-                        <button onClick={handleToggleBlock}>
-                            Simulate Block
-                        </button>
-                    </div>
-
-                    <div className="sim-box" style={{ border: '1px solid #ddd', padding: '10px', borderRadius: '5px', marginTop: '10px' }}>
-                        <p><strong>Available Bonuses</strong></p>
-                        {bonuses.map(b => (
-                            <button key={b.value} onClick={() => handleClaimBonus(b.value)} style={{ marginRight: '5px', fontSize: '12px' }}>
-                                Claim {b.text}
+            <div className="grid-layout">
+                <div className="main-column">
+                    <section className="glass-panel">
+                        <div className="section-header">
+                            <h3>🎰 Game Actions</h3>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+                            <button className="btn-primary" onClick={handleDeposit} style={{ height: '100px', fontSize: '1.1rem' }}>
+                                Deposit 100 {currency}
                             </button>
-                        ))}
-                    </div>
-                </section>
+                            <button className="btn-secondary" onClick={handlePlayRound} style={{ height: '100px', fontSize: '1.4rem' }}>
+                                Play Slot (Bet 10)
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="glass-panel">
+                        <div className="section-header">
+                            <h3>👤 User Profile</h3>
+                        </div>
+                        <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>First Name</label>
+                                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>Surname</label>
+                                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Surname" />
+                            </div>
+                            <button type="submit" className="btn-primary" style={{ padding: '14px 24px' }}>Update Profile</button>
+                        </form>
+                    </section>
+                </div>
+
+                <div className="side-column">
+                    <section className="glass-panel">
+                        <div className="section-header">
+                            <h3>⚡ Simulation</h3>
+                        </div>
+                        <div className="sim-grid">
+                            <button className="btn-outline" onClick={handleRegistrationSim}>Sim Reg</button>
+                            <button className="btn-outline" onClick={handleToggleBlock}>Sim Block</button>
+                            <button className="btn-outline" onClick={handleToggleConsent} style={{ gridColumn: 'span 2' }}>
+                                Marketing: {marketingOpted ? 'OPT-IN' : 'OPT-OUT'}
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="glass-panel">
+                        <div className="section-header">
+                            <h3>🎁 Active Bonuses</h3>
+                        </div>
+                        <div className="bonus-list">
+                            {bonuses.length > 0 ? bonuses.map(b => (
+                                <div key={b.value} className="bonus-card">
+                                    <div>
+                                        <h4>{b.text}</h4>
+                                        <p>Limited time offer</p>
+                                    </div>
+                                    <button className="btn-primary" style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem' }} onClick={() => handleClaimBonus(b.value)}>
+                                        Claim
+                                    </button>
+                                </div>
+                            )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available at the moment.</p>}
+                        </div>
+                    </section>
+                </div>
             </div>
         </div>
     );
 }
 
 export default Dashboard;
+

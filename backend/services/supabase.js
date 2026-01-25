@@ -59,9 +59,17 @@ const getUser = async (token) => {
     const cleanToken = token ? token.trim() : '';
     console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
 
+    // 1. Check Mock DB first for PoC/Testing
+    for (const user of mockDB.users.values()) {
+        if (user.token === cleanToken) {
+            console.log('[Auth] Mock user found');
+            return user;
+        }
+    }
+
+    // 2. Fallback to Supabase if initialized
     if (supabase) {
         console.log('[Supabase] Using Supabase Client');
-        // Look up custom 'users' table by token
         const { data, error: dbError } = await supabase
             .from('users')
             .select('*')
@@ -70,23 +78,13 @@ const getUser = async (token) => {
 
         if (data) return data;
 
-        // Fallback to Supabase Auth only if table lookup fails
         try {
             const { data: { user }, error } = await supabase.auth.getUser(token);
             if (user) return user;
-        } catch (e) {
-            // Ignore auth errors if token is not a JWT
-        }
-
-        return null;
-    } else {
-        console.warn('[Auth] Supabase client not initialized. Falling back to Mock DB.');
-        // Mock lookup
-        for (const user of mockDB.users.values()) {
-            if (user.token === cleanToken) return user;
-        }
-        return null;
+        } catch (e) { }
     }
+
+    return null;
 };
 
 const getUserById = async (userId) => {
@@ -103,28 +101,37 @@ const getUserById = async (userId) => {
     }
 }
 
-const updateBalance = async (userId, newBalance) => {
+const updateUser = async (userId, updates) => {
+    // 1. Check Mock DB first
+    const mockUser = mockDB.users.get(userId);
+    if (mockUser) {
+        console.log('[Supabase] Updating user in Mock DB');
+        const updatedUser = { ...mockUser, ...updates };
+        mockDB.users.set(userId, updatedUser);
+        return updatedUser;
+    }
+
+    // 2. Fallback to Supabase
     if (supabase) {
         const { data, error } = await supabase
             .from('users')
-            .update({ balance: newBalance })
+            .update(updates)
             .eq('id', userId)
             .select();
         if (error) throw error;
         return data[0];
-    } else {
-        const user = mockDB.users.get(userId);
-        if (user) {
-            user.balance = newBalance;
-            mockDB.users.set(userId, user);
-            return user;
-        }
-        throw new Error('User not found');
     }
+
+    throw new Error('User not found');
+};
+
+const updateBalance = async (userId, newBalance) => {
+    return updateUser(userId, { balance: newBalance });
 };
 
 module.exports = {
     getUser,
     getUserById,
-    updateBalance
+    updateBalance,
+    updateUser
 };

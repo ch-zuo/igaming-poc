@@ -68,3 +68,24 @@ export const creditBonusFunds = async (token, userId, amount, bonusCode) => {
     });
     return response.data;
 };
+
+export const triggerRegistration = async (token) => {
+    const response = await axios.post(`${API_URL}/registration`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const logout = async (token) => {
+    const response = await axios.post(`${API_URL}/logout`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const updateUser = async (token, userData) => {
+    const response = await axios.post(`${API_URL}/user/update`, userData, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};

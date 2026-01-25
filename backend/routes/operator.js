@@ -158,6 +158,58 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     });
 });
 
+/**
+ * 0. POST /registration
+ * Explicitly triggers a registration event to FT.
+ */
+router.post('/registration', authenticateUser, async (req, res) => {
+    await ftService.pushEvent(req.user.id, 'registration', {
+        note: 'User registered via PoC platform',
+        user_agent: req.headers['user-agent'],
+        ip_address: req.ip
+    });
+    res.json({ status: 'success', message: 'Registration event pushed' });
+});
+
+/**
+ * 0.5 POST /logout
+ * Triggers a logout event to FT.
+ */
+router.post('/logout', authenticateUser, async (req, res) => {
+    await ftService.pushEvent(req.user.id, 'logout', {});
+    res.json({ status: 'success', message: 'Logout event pushed' });
+});
+
+/**
+ * 0.6 POST /user/update
+ * Updates user profile and triggers user_update event to FT.
+ */
+router.post('/user/update', authenticateUser, async (req, res) => {
+    const { first_name, last_name, email } = req.body;
+
+    const updates = {};
+    if (first_name) updates.first_name = first_name;
+    if (last_name) updates.last_name = last_name;
+    if (email) updates.email = email;
+
+    try {
+        const updatedUser = await supabaseService.updateUser(req.user.id, updates);
+
+        await ftService.pushEvent(req.user.id, 'user_update', {
+            first_name: updatedUser.first_name,
+            last_name: updatedUser.last_name,
+            email: updatedUser.email,
+            birth_date: updatedUser.birth_date,
+            country: updatedUser.country,
+            currency: updatedUser.currency
+        });
+
+        res.json({ status: 'success', user: updatedUser });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update user', details: error.message });
+    }
+});
+
 // Helper for PoC Frontend "Deposit" button
 router.post('/deposit', authenticateUser, async (req, res) => {
     const { amount } = req.body;
@@ -252,6 +304,20 @@ router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => 
 });
 
 /**
+ * 2.5 PUT /userblocks/:userid
+ * Receives block updates/simulations and pushes to FT.
+ */
+router.put('/userblocks/:userid', authenticateUser, async (req, res) => {
+    const { userid } = req.params;
+    const { blocks } = req.body;
+
+    // Push 'blocks' event to FT
+    await ftService.pushEvent(userid, 'blocks', { blocks });
+
+    res.json({ status: 'success', origin: PLATFORM_ORIGIN });
+});
+
+/**
  * 3. GET /userconsents/:userid
  * Returns marketing/data consents (mocked for PoC).
  */
@@ -279,8 +345,24 @@ router.post('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) 
 
     console.log(`[Operator API] Consents updated for user ${userid}:`, consents);
 
+    // Push 'consents' event to FT
+    await ftService.pushEvent(userid, 'consents', { consents });
+
     // In dynamic PoC, we would update the DB here.
     // For now, we acknowledge success.
+    res.json({ status: 'success', origin: PLATFORM_ORIGIN });
+});
+
+/**
+ * 3.6 PUT /userconsents/:userid
+ * Dashboard uses PUT to sync with FT events.
+ */
+router.put('/userconsents/:userid', authenticateUser, async (req, res) => {
+    const { userid } = req.params;
+    const { consents } = req.body;
+
+    await ftService.pushEvent(userid, 'consents', { consents });
+
     res.json({ status: 'success', origin: PLATFORM_ORIGIN });
 });
 
