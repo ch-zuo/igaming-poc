@@ -34,7 +34,7 @@ const runSimulation = async () => {
                 }, {
                     headers: { 'x-api-key': API_KEY }
                 });
-                console.log(`[Bet] Success. New Balance: ${betRes.data.balance} ${betRes.data.currency}`);
+                console.log(`[Bet] Success. New Balances: Real=${betRes.data.balance}, Bonus=${betRes.data.bonus_balance || 0} ${betRes.data.currency}`);
             } catch (e) {
                 console.error('[Bet] Failed:', e.response?.data || e.message);
                 continue; // Skip rest of round if bet failed
@@ -57,7 +57,7 @@ const runSimulation = async () => {
                     }, {
                         headers: { 'x-api-key': API_KEY }
                     });
-                    console.log(`[Win] Credit Success. New Balance: ${winRes.data.balance}`);
+                    console.log(`[Win] Credit Success. New Balances: Real=${winRes.data.balance}, Bonus=${winRes.data.bonus_balance || 0}`);
                 } catch (e) {
                     console.error('[Win] Failed:', e.response?.data || e.message);
                 }

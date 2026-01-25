@@ -134,25 +134,30 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const handlePlayRound = async () => {
         try {
             setStatus('Spinning...');
-            await placeBet(token, user.user_id, 10);
-            setBalance(b => b - 10);
+            const betRes = await placeBet(token, user.user_id, 10);
+
+            // Sync balances from server response immediately after bet
+            setBalance(betRes.balance);
+            setBonusBalance(betRes.bonus_balance || 0);
 
             setTimeout(async () => {
                 const isWin = Math.random() > 0.7;
                 if (isWin) {
                     const winAmount = 20;
-                    await axios.post('/api/credit', {
+                    const winRes = await axios.post('/api/credit', {
                         user_id: user.user_id,
                         amount: winAmount,
                         transaction_id: `ctx-${Date.now()}`,
                         game_id: 'slot-game-1'
                     }, { headers: { Authorization: `Bearer ${token}` } });
 
-                    setBalance(b => b + winAmount);
+                    // Sync balances from server response after win
+                    setBalance(winRes.data.balance);
+                    setBonusBalance(winRes.data.bonus_balance || 0);
                     setStatus('BIG WIN: 20!');
                 } else {
                     setStatus('No Win');
-                    fetchBalance();
+                    fetchBalance(); // Final sync
                 }
             }, 800);
         } catch (err) {
