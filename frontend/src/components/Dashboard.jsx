@@ -226,8 +226,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                             <h3>⚡ Simulation</h3>
                         </div>
                         <div className="sim-grid">
-                            <button className="btn-outline" onClick={handleRegistrationSim}>Sim Reg</button>
-                            <button className="btn-outline" onClick={handleToggleBlock}>Sim Block</button>
+                            <button className="btn-outline" onClick={handleToggleBlock} style={{ gridColumn: 'span 2' }}>Sim Block Event</button>
                             <button className="btn-outline" onClick={handleToggleConsent} style={{ gridColumn: 'span 2' }}>
                                 Marketing: {marketingOpted ? 'OPT-IN' : 'OPT-OUT'}
                             </button>

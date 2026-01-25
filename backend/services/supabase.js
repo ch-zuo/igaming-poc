@@ -18,6 +18,7 @@ const mockDB = {
     users: new Map([
         ['test-user', {
             id: 'test-user',
+            'user_update': { path: '/v2/integration/user', method: 'POST' }, // Changed from PUT to POST for upsert pattern
             user_id: 'test-user',
             username: 'Test User',
             balance: 1000,
@@ -55,13 +56,16 @@ if (supabaseUrl && supabaseKey) {
     console.warn('[Supabase Init] Supabase credentials not found. Falling back to Mock DB.');
 }
 
-const getUser = async (token) => {
+const getUser = async (username, token) => {
     const cleanToken = token ? token.trim() : '';
     console.log(`[Auth] Attempting login with token: "${cleanToken.substring(0, 5)}..."`);
 
     // 1. Check Mock DB first for PoC/Testing
+    const cleanUsername = username ? username.trim().toLowerCase() : '';
+    console.log(`[Auth] Attempting login for username: "${cleanUsername}" with token: "${cleanToken.substring(0, 5)}..."`);
+
     for (const user of mockDB.users.values()) {
-        if (user.token === cleanToken) {
+        if (user.token === cleanToken && user.username.toLowerCase() === cleanUsername) {
             console.log('[Auth] Mock user found');
             return user;
         }
@@ -125,6 +129,30 @@ const updateUser = async (userId, updates) => {
     throw new Error('User not found');
 };
 
+const createUser = async (userData) => {
+    const id = userData.username || `user_${Date.now()}`;
+    const newUser = {
+        id,
+        user_id: id,
+        balance: 1000,
+        currency: 'EUR',
+        registration_date: new Date().toISOString(),
+        ...userData
+    };
+
+    if (supabase) {
+        const { data, error } = await supabase
+            .from('users')
+            .insert([newUser])
+            .select();
+        if (error) throw error;
+        return data[0];
+    } else {
+        mockDB.users.set(id, newUser);
+        return newUser;
+    }
+};
+
 const updateBalance = async (userId, newBalance) => {
     return updateUser(userId, { balance: newBalance });
 };
@@ -133,5 +161,6 @@ module.exports = {
     getUser,
     getUserById,
     updateBalance,
-    updateUser
+    updateUser,
+    createUser
 };

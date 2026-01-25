@@ -8,17 +8,18 @@ const PLATFORM_ORIGIN = process.env.PLATFORM_ORIGIN || 'igaming-poc';
 // Middleware to mock authentication or extract token
 const authenticateUser = async (req, res, next) => {
     const token = req.headers['authorization'];
+    const username = req.headers['x-username'] || req.body.username;
     const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
 
-    console.log(`[Middleware] Extracted Token: "${actualToken ? actualToken.substring(0, 5) : 'null'}..."`);
+    console.log(`[Middleware] Auth Attempt for: ${username} | Token: "${actualToken ? actualToken.substring(0, 5) : 'null'}..."`);
 
     if (!actualToken) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-    const user = await supabaseService.getUser(actualToken);
+    const user = await supabaseService.getUser(username, actualToken);
     if (!user) {
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Invalid username or token' });
     }
 
     req.user = user;
@@ -169,6 +170,45 @@ router.post('/registration', authenticateUser, async (req, res) => {
         ip_address: req.ip
     });
     res.json({ status: 'success', message: 'Registration event pushed' });
+});
+
+/**
+ * NEW Post /register
+ * Handles signup process
+ */
+router.post('/register', async (req, res) => {
+    const { username, first_name, last_name, email } = req.body;
+
+    if (!username || !email) {
+        return res.status(400).json({ error: 'Username and Email are required' });
+    }
+
+    // Generate a mock token for the user
+    const token = `token-${username}-${Date.now()}`;
+
+    try {
+        const newUser = await supabaseService.createUser({
+            username,
+            first_name,
+            last_name,
+            email,
+            token
+        });
+
+        // Push 'registration' event to FT
+        await ftService.pushEvent(newUser.id, 'registration', {
+            note: 'User registered via NeoStrike Gate',
+            user_agent: req.headers['user-agent'],
+            ip_address: req.ip,
+            first_name: newUser.first_name,
+            last_name: newUser.last_name,
+            email: newUser.email
+        });
+
+        res.json({ status: 'success', user: newUser, token });
+    } catch (error) {
+        res.status(500).json({ error: 'Registration failed', details: error.message });
+    }
 });
 
 /**

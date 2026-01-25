@@ -3,10 +3,15 @@ import axios from 'axios';
 // Use relative path for production (Vercel) and proxy for local dev
 const API_URL = '/api';
 
-export const login = async (token) => {
-    const response = await axios.post(`${API_URL}/authenticate`, {}, {
+export const login = async (username, token) => {
+    const response = await axios.post(`${API_URL}/authenticate`, { username }, {
         headers: { Authorization: `Bearer ${token}` }
     });
+    return response.data;
+};
+
+export const register = async (userData) => {
+    const response = await axios.post(`${API_URL}/register`, userData);
     return response.data;
 };
 

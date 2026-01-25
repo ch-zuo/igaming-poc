@@ -11,7 +11,7 @@ const EVENT_CONFIG = {
     'blocks': { path: '/v2/integration/user/blocks', method: 'PUT' },
     'registration': { path: '/v2/integration/user', method: 'POST' },
     'register': { path: '/v2/integration/user', method: 'POST' },
-    'user_update': { path: '/v2/integration/user', method: 'PUT' }, // 'User Updates'
+    'user_update': { path: '/v2/integration/user', method: 'POST' }, // 'User Updates' - Switched to POST for upsert pattern
     'logout': { path: '/v2/integration/logout', method: 'POST' },
     'payment': { path: '/v1/integration/payment', method: 'POST' },
     'casino': { path: '/v1/integration/casino', method: 'POST' },
