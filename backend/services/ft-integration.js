@@ -58,13 +58,19 @@ const pushEvent = async (userId, eventType, payload) => {
                 timestamp: timestamp,
                 origin: origin
             };
-        } else if (eventType === 'registration' || eventType === 'register') {
+        } else if (eventType === 'registration') {
             requestBody = {
                 user_id: userId,
                 note: payload.note || 'New user registration',
                 user_agent: payload.user_agent || 'Mozilla/5.0',
                 ip_address: payload.ip_address || '127.0.0.1',
                 timestamp: timestamp, // already ISO/RFC3339
+                origin: origin
+            };
+        } else if (eventType === 'user_update') {
+            requestBody = {
+                user_id: userId,
+                timestamp: timestamp,
                 origin: origin
             };
         } else if (eventType === 'consents') {
@@ -79,20 +85,6 @@ const pushEvent = async (userId, eventType, payload) => {
                 timestamp: timestamp,
                 origin: origin
             };
-        } else if (eventType === 'user_update') {
-            requestBody = {
-                user_id: userId,
-                first_name: payload.first_name,
-                last_name: payload.last_name,
-                email: payload.email,
-                birth_date: payload.birth_date,
-                country: payload.country,
-                currency: payload.currency,
-                timestamp: timestamp,
-                origin: origin
-            };
-            // Remove undefined fields to avoid sending nulls to FT if not provided
-            Object.keys(requestBody).forEach(key => requestBody[key] === undefined && delete requestBody[key]);
         } else if (eventType === 'logout') {
             requestBody = {
                 user_id: userId,
@@ -137,7 +129,8 @@ const pushEvent = async (userId, eventType, payload) => {
                 origin: origin,
                 timestamp: timestamp
             };
-        } else if (eventType === 'bonus') {
+        }
+        else if (eventType === 'bonus') {
             requestBody = {
                 user_id: userId,
                 bonus_id: payload.bonus_id || '9821',
