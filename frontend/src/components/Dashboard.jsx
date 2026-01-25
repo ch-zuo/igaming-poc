@@ -14,6 +14,7 @@ import axios from 'axios';
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
     const [balance, setBalance] = useState(0);
+    const [bonusBalance, setBonusBalance] = useState(0);
     const [currency, setCurrency] = useState('EUR');
     const [status, setStatus] = useState('System ready');
     const [bonuses, setBonuses] = useState([]);
@@ -31,6 +32,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         try {
             const data = await getBalance(token);
             setBalance(data.amount);
+            setBonusBalance(data.bonus_amount || 0);
             setCurrency(data.currency);
         } catch (err) {
             console.error(err);
@@ -50,6 +52,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         try {
             const data = await deposit(token, 100);
             setBalance(data.balance);
+            setBonusBalance(data.bonus_amount || 0);
             setStatus('Deposit Success: +100 ' + data.currency);
         } catch (err) {
             setStatus('Deposit failed');
@@ -178,12 +181,19 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 </div>
             </header>
 
-            <div className="hero-balance floating">
-                <label>Available Balance</label>
-                <h2>{balance.toFixed(2)} <small style={{ fontSize: '2rem' }}>{currency}</small></h2>
-                <div className="status-log">
-                    {status}
+            <div className="wallets-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                <div className="hero-balance floating">
+                    <label>Real Balance</label>
+                    <h2>{balance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
                 </div>
+                <div className="hero-balance floating bonus-wallet" style={{ borderLeft: '4px solid var(--accent-gold, #ffd700)' }}>
+                    <label>Bonus Balance</label>
+                    <h2>{bonusBalance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
+                </div>
+            </div>
+
+            <div className="status-banner glass-panel" style={{ marginBottom: '24px', padding: '12px', textAlign: 'center', color: 'var(--primary)' }}>
+                {status}
             </div>
 
             <div className="grid-layout">

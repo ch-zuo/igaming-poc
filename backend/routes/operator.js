@@ -44,6 +44,7 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
     await ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
     await ftService.pushEvent(req.user.id, 'balance', {
         amount: req.user.balance,
+        bonus_amount: req.user.bonus_balance || 0,
         currency: req.user.currency
     });
 
@@ -58,6 +59,7 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
 router.get('/balance', authenticateUser, async (req, res) => {
     res.json({
         amount: req.user.balance,
+        bonus_amount: req.user.bonus_balance || 0,
         currency: req.user.currency,
         origin: PLATFORM_ORIGIN
     });
@@ -319,6 +321,7 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
         registration_code: user.registration_code || "ABC123",
         affiliate_reference: user.affiliate_reference || "AFF_DEFAULT",
         verified_at: user.verified_at || '2023-01-01T08:00:00Z',
+        bonus_balance: user.bonus_balance || 0,
         segmentation: user.segmentation || {
             vip_level: 1,
             special_segmentation: "PoC"
@@ -430,8 +433,10 @@ router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
     // In dynamic PoC, validate bonus_code...
     // For now, we assume fixed $10 reward for any valid code
     const bonusAmount = 10.0;
-    const newBalance = user.balance + bonusAmount;
-    await supabaseService.updateBalance(user.id, newBalance);
+    const currentBonusBalance = user.bonus_balance || 0;
+    const newBonusBalance = currentBonusBalance + bonusAmount;
+
+    await supabaseService.updateUser(user.id, { bonus_balance: newBonusBalance });
 
     // Push 'bonus' event back to FT
     await ftService.pushEvent(user.id, 'bonus', {
@@ -443,9 +448,10 @@ router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
         currency: user.currency
     });
 
-    // Sync balance
+    // Sync balances (Both Real and Bonus)
     await ftService.pushEvent(user.id, 'balance', {
-        amount: newBalance,
+        amount: user.balance,
+        bonus_amount: newBonusBalance,
         currency: user.currency
     });
 
@@ -485,8 +491,10 @@ router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) =>
     }
 
     // Note: Currency conversion could happen here if currency !== user.currency
-    const newBalance = user.balance + parseFloat(amount);
-    await supabaseService.updateBalance(user.id, newBalance);
+    const currentBonusBalance = user.bonus_balance || 0;
+    const newBonusBalance = currentBonusBalance + parseFloat(amount);
+
+    await supabaseService.updateUser(user.id, { bonus_balance: newBonusBalance });
 
     // Push 'bonus' event
     await ftService.pushEvent(user.id, 'bonus', {
@@ -498,9 +506,10 @@ router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) =>
         currency: currency || user.currency
     });
 
-    // Sync balance
+    // Sync balances (Both Real and Bonus)
     await ftService.pushEvent(user.id, 'balance', {
-        amount: newBalance,
+        amount: user.balance,
+        bonus_amount: newBonusBalance,
         currency: user.currency
     });
 

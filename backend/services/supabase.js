@@ -22,6 +22,7 @@ const mockDB = {
             user_id: 'test-user',
             username: 'Test User',
             balance: 1000,
+            bonus_balance: 0,
             currency: 'EUR',
             token: 'valid-token',
             country: 'MT',
