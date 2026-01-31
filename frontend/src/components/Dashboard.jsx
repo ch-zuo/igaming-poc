@@ -10,6 +10,7 @@ import {
     logout as apiLogout
 } from '../services/api';
 import axios from 'axios';
+import ActivitySidebar from './ActivitySidebar';
 
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
@@ -22,6 +23,81 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
     const [firstName, setFirstName] = useState(user.first_name || '');
     const [lastName, setLastName] = useState(user.last_name || '');
+
+    const [inboundLogs, setInboundLogs] = useState([]);
+    const [outboundLogs, setOutboundLogs] = useState([]);
+
+    const addLog = (type, log) => {
+        const newLog = {
+            id: Date.now() + Math.random(),
+            timestamp: new Date().toISOString(),
+            ...log
+        };
+        if (type === 'inbound') {
+            setInboundLogs(prev => [newLog, ...prev].slice(0, 50));
+        } else {
+            setOutboundLogs(prev => [newLog, ...prev].slice(0, 50));
+        }
+    };
+
+    // Axios Interceptor for Outbound Logging
+    useEffect(() => {
+        const reqInterceptor = axios.interceptors.request.use((config) => {
+            // We'll log the response instead to get the full picture, 
+            // but we can track the start here if needed.
+            return config;
+        });
+
+        const resInterceptor = axios.interceptors.response.use(
+            (response) => {
+                addLog('outbound', {
+                    method: response.config.method.toUpperCase(),
+                    endpoint: response.config.url,
+                    status: response.status,
+                    payload: {
+                        request: response.config.data ? JSON.parse(response.config.data) : null,
+                        response: response.data
+                    }
+                });
+                return response;
+            },
+            (error) => {
+                addLog('outbound', {
+                    method: error.config?.method?.toUpperCase() || 'UNKNOWN',
+                    endpoint: error.config?.url || 'UNKNOWN',
+                    status: error.response?.status || 500,
+                    payload: {
+                        error: error.message,
+                        details: error.response?.data
+                    }
+                });
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            axios.interceptors.request.eject(reqInterceptor);
+            axios.interceptors.response.eject(resInterceptor);
+        };
+    }, []);
+
+    // Simulate Inbound Activity (Webhooks)
+    useEffect(() => {
+        const scenarios = [
+            { method: 'POST', endpoint: '/webhook/deposit', status: 200, payload: { event: 'payment.success', amount: 100, currency: 'EUR', user_id: user.user_id } },
+            { method: 'POST', endpoint: '/webhook/kyc', status: 200, payload: { event: 'identity.verified', status: 'approved', user_id: user.user_id } },
+            { method: 'POST', endpoint: '/webhook/bonus', status: 200, payload: { event: 'bonus.awarded', type: 'loyalty_spin', value: 5 } }
+        ];
+
+        const interval = setInterval(() => {
+            if (Math.random() > 0.7) {
+                const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+                addLog('inbound', scenario);
+            }
+        }, 8000);
+
+        return () => clearInterval(interval);
+    }, [user.user_id]);
 
     useEffect(() => {
         fetchBalance();
@@ -267,6 +343,8 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         </div>
                     </section>
                 </div>
+
+                <ActivitySidebar inboundLogs={inboundLogs} outboundLogs={outboundLogs} />
             </div>
         </div>
     );
