@@ -94,14 +94,12 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         const savedSecret = user.ft_jwt_secret;
 
         if (!savedBrand || !savedOrigin || !savedSecret) return;
-
-        // Use a local ref to avoid redundant calls during a single mount lifecycle
         if (ftInitRef.current) return;
 
         const initFastTrack = async () => {
             try {
                 ftInitRef.current = true;
-                console.log('[FT OnSite][v1.5] Start Init Flow...');
+                console.log('[FT OnSite][v1.6] Start Init Flow...');
 
                 // 1. Get the fresh JWT token
                 const { data } = await axios.get('/api/ft-token', {
@@ -110,44 +108,42 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
                 const runInit = () => {
                     if (window.FasttrackCrm) {
-                        // v1.5: ONLY init if the token is actually new
+                        // v1.6: Strict Token Singleton
                         if (lastInitializedFTToken === data.token) {
-                            console.log('[FT OnSite] Token already initialized, skipping redundant init.');
+                            console.log('[FT OnSite] Token already initialized (v1.6 guard)');
                             return;
                         }
 
                         lastInitializedFTToken = data.token;
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized/Re-authenticated (v1.5)');
+                        console.log('[FT OnSite] Success: Initialized (v1.6)');
                         setIsFTInitialized(true);
                         setStatus('Fast Track Ready!');
                     }
                 };
 
-                // 2. Check global singleton state
+                // 2. Synchronous Configuration (Pre-set globals)
+                window.fasttrackbrand = savedBrand;
+                window.source = savedOrigin;
+                window.fasttrack = {
+                    enableJWT: true,
+                    integrationVersion: 1.1,
+                    autoInit: false,
+                    inbox: { enable: true }
+                };
+
+                // 3. Handle Loader Singleton
                 if (window.FasttrackCrm) {
                     runInit();
                 } else if (isFTScriptLoaded || isFTLibraryInitializing) {
-                    // Loader is coming, wait for it
                     const checkInterval = setInterval(() => {
                         if (window.FasttrackCrm) {
                             clearInterval(checkInterval);
-                            runInit();
+                            setTimeout(runInit, 1000); // Wait for lib to settle
                         }
                     }, 500);
                 } else {
-                    // 3. Fresh Injection (Only happens once per page load)
                     isFTLibraryInitializing = true;
-
-                    window.fasttrackbrand = savedBrand;
-                    window.source = savedOrigin;
-                    window.fasttrack = {
-                        enableJWT: true,
-                        integrationVersion: 1.1,
-                        autoInit: false,
-                        inbox: { enable: true }
-                    };
-
                     const script = document.createElement('script');
                     script.id = 'ft-onsite-script';
                     script.async = true;
@@ -158,9 +154,9 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         isFTLibraryInitializing = false;
                         if (window.FastTrackLoader && !window.FasttrackCrm) {
                             new window.FastTrackLoader();
-                            setTimeout(runInit, 1000);
+                            setTimeout(runInit, 2000); // v1.6: Increased settle time
                         } else {
-                            runInit();
+                            setTimeout(runInit, 1000);
                         }
                     };
                     document.body.appendChild(script);
@@ -177,7 +173,6 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         }, 2000);
 
         initFastTrack();
-
         return () => clearInterval(badgeInterval);
     }, [user.ft_brand_name, user.ft_origin, user.ft_jwt_secret, token]);
 
