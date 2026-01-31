@@ -3,11 +3,16 @@ import axios from 'axios';
 import ActivitySidebar from './ActivitySidebar';
 import { getBalance, getBonusList, updateUser, creditBonus, triggerRegistration, logout as apiLogout } from '../services/api';
 
-// Global Singleton Guard for Fast Track (v1.7)
-let isFTScriptLoaded = false;
-let isFTLibraryInitializing = false;
-let isFTConnectInProgress = false; // Module-level lock
-let lastInitializedFTToken = null;
+// Global Singleton Guard for Fast Track (v1.8)
+// Using window-level keys for maximum persistence across environment reloads
+if (!window.__FT_STATE__) {
+    window.__FT_STATE__ = {
+        isFTScriptLoaded: false,
+        isFTLibraryInitializing: false,
+        isFTConnectInProgress: false,
+        lastInitializedFTToken: null
+    };
+}
 
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
@@ -29,6 +34,8 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isFTInitialized, setIsFTInitialized] = useState(false);
     const ftInitRef = useRef(false);
+
+    const userIdDisplay = user?.user_id || user?.id || '---';
 
     // Sync state if user prop changes (e.g. after login or update)
     useEffect(() => {
@@ -95,40 +102,42 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         const savedSecret = user.ft_jwt_secret;
 
         if (!savedBrand || !savedOrigin || !savedSecret) return;
-
-        // v1.7: Local ref prevents re-run during same mount
         if (ftInitRef.current) return;
 
         const initFastTrack = async () => {
-            // v1.7: Global lock prevents re-run across ALL mounts in same page session
-            if (isFTConnectInProgress) return;
+            const state = window.__FT_STATE__;
+            if (state.isFTConnectInProgress) return;
 
             try {
                 ftInitRef.current = true;
 
-                // 1. Get the fresh JWT token
                 const { data } = await axios.get('/api/ft-token', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                // Check if this token is already handled globally
-                if (lastInitializedFTToken === data.token) {
-                    console.log('[FT OnSite] Token already initialized globally (v1.7)');
+                if (state.lastInitializedFTToken === data.token) {
+                    console.log(`[FT OnSite] v1.8: Already initialized for user ${userIdDisplay}`);
+                    setIsFTInitialized(true);
                     return;
                 }
 
-                isFTConnectInProgress = true;
-                console.log('[FT OnSite][v1.7] Start Init Flow (Singleton)...');
+                state.isFTConnectInProgress = true;
+                console.log(`[FT OnSite][v1.8] Init for user: ${userIdDisplay}`);
 
                 const runInit = () => {
                     if (window.FasttrackCrm) {
-                        lastInitializedFTToken = data.token;
+                        state.lastInitializedFTToken = data.token;
+
+                        // v1.8: Add explicit handlers BEFORE init to catch the incoming message crash
+                        window.FasttrackCrm.onNotification = (n) => console.log('[FT OnSite] Notification Received:', n);
+                        window.FasttrackCrm.onMessage = (m) => console.log('[FT OnSite] Message Received:', m);
+                        window.FasttrackCrm.onError = (e) => console.error('[FT OnSite] Library Error:', e);
+
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized (v1.7)');
+                        console.log('[FT OnSite] Success: Initialized (v1.8)');
                         setIsFTInitialized(true);
-                        setStatus('Fast Track Ready!');
-                        // Release lock after success to allow future re-authentication if token changes
-                        isFTConnectInProgress = false;
+                        setStatus('Fast Track Ready (v1.8)');
+                        state.isFTConnectInProgress = false;
                     }
                 };
 
@@ -137,15 +146,14 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 window.source = savedOrigin;
                 window.fasttrack = {
                     enableJWT: true,
-                    integrationVersion: 1.1,
+                    integrationVersion: '1.0', // v1.8: Downgrade to 1.0 for stability
                     autoInit: false,
                     inbox: { enable: true }
                 };
 
-                // 3. Handle Script/Loader Presence
                 if (window.FasttrackCrm) {
                     runInit();
-                } else if (isFTScriptLoaded || isFTLibraryInitializing) {
+                } else if (state.isFTScriptLoaded || state.isFTLibraryInitializing) {
                     const checkInterval = setInterval(() => {
                         if (window.FasttrackCrm) {
                             clearInterval(checkInterval);
@@ -153,39 +161,48 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         }
                     }, 500);
                 } else {
-                    isFTLibraryInitializing = true;
+                    state.isFTLibraryInitializing = true;
                     const script = document.createElement('script');
                     script.id = 'ft-onsite-script';
                     script.async = true;
                     script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
 
                     script.onload = () => {
-                        isFTScriptLoaded = true;
-                        isFTLibraryInitializing = false;
+                        state.isFTScriptLoaded = true;
+                        state.isFTLibraryInitializing = false;
                         if (window.FastTrackLoader && !window.FasttrackCrm) {
                             new window.FastTrackLoader();
-                            setTimeout(runInit, 2000); // 2s settle time
+                            setTimeout(runInit, 2500); // 2.5s settle time
                         } else {
-                            setTimeout(runInit, 1000);
+                            setTimeout(runInit, 1500);
                         }
                     };
                     document.body.appendChild(script);
                 }
             } catch (err) {
-                console.error('[FT OnSite] Init Error:', err);
+                console.error('[FT OnSite] v1.8 Init Error:', err);
                 ftInitRef.current = false;
-                isFTConnectInProgress = false;
+                window.__FT_STATE__.isFTConnectInProgress = false;
             }
         };
 
+        initFastTrack();
+    }, [user.ft_brand_name, user.ft_origin, user.ft_jwt_secret, token]);
+
+    // Separate unread count effect to avoid lifecycle noise
+    useEffect(() => {
+        if (!isFTInitialized) return;
+
         const badgeInterval = setInterval(() => {
             const badge = document.getElementById('ft-crm-inbox-badge');
-            if (badge) setUnreadCount(parseInt(badge.innerText) || 0);
-        }, 2000);
+            if (badge) {
+                const count = parseInt(badge.innerText) || 0;
+                setUnreadCount(count);
+            }
+        }, 5000); // 5s to reduce DOM contention
 
-        initFastTrack();
         return () => clearInterval(badgeInterval);
-    }, [user.ft_brand_name, user.ft_origin, user.ft_jwt_secret, token]);
+    }, [isFTInitialized]);
 
     // Initial Data Fetch
     useEffect(() => {
