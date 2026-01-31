@@ -103,7 +103,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     return;
                 }
 
-                console.log('[FT OnSite] Initializing singleton...');
+                console.log('[FT OnSite][v1.2] Initializing singleton...');
 
                 // 1. Get the JWT token
                 const { data } = await axios.get('/api/ft-token', {
