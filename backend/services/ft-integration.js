@@ -61,13 +61,14 @@ const pushEvent = async (userId, eventType, payload) => {
         const mockLog = {
             method: config?.method || 'POST',
             url: `MOCK_URL${config?.path || ''}`,
+            path: config?.path?.replace(/^\/v[12]\/integration/, '') || 'unknown',
             request: { info: 'API Key missing', type: eventType, userId },
             response: { status: 'mocked', message: 'No API Key' },
             status: 200
         };
         logActivity('outbound', {
             method: mockLog.method,
-            endpoint: mockLog.url,
+            endpoint: mockLog.path,
             status: mockLog.status,
             payload: { request: mockLog.request, response: mockLog.response }
         });
@@ -110,19 +111,34 @@ const pushEvent = async (userId, eventType, payload) => {
             headers: { 'X-API-Key': FT_API_KEY, 'Content-Type': 'application/json' }
         });
 
-        const telemetry = { method: config.method, url: targetUrl, request: requestBody, response: response.data, status: response.status };
+        const telemetry = {
+            method: config.method,
+            url: targetUrl,
+            path: config.path.replace(/^\/v[12]\/integration/, ''), // Shortened path for display
+            request: requestBody,
+            response: response.data,
+            status: response.status
+        };
         logActivity('outbound', {
             method: telemetry.method,
-            endpoint: telemetry.url,
+            endpoint: telemetry.path,
             status: telemetry.status,
             payload: { request: telemetry.request, response: telemetry.response }
         });
         return telemetry;
     } catch (error) {
-        const errorData = { method: config.method, url: targetUrl, request: requestBody, error: error.message, status: error.response?.status || 500, response: error.response?.data };
+        const errorData = {
+            method: config?.method || 'POST',
+            url: targetUrl,
+            path: config?.path?.replace(/^\/v[12]\/integration/, '') || 'unknown',
+            request: requestBody,
+            error: error.message,
+            status: error.response?.status || 500,
+            response: error.response?.data
+        };
         logActivity('outbound', {
             method: errorData.method,
-            endpoint: errorData.url,
+            endpoint: errorData.path,
             status: errorData.status,
             payload: { request: errorData.request, response: errorData.response || { error: error.message } }
         });

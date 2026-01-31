@@ -384,9 +384,12 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 80px);
+  /* Slightly taller */
+  max-height: 900px;
+  /* Cap it for very large screens if needed */
   position: sticky;
-  top: 20px;
+  top: 24px;
 }
 
 .log-section {
@@ -409,10 +412,12 @@ input:focus {
 }
 
 .log-section-header h4 {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.15em;
+  /* More spacing */
   margin: 0;
+  color: var(--text-muted);
 }
 
 .log-list {
@@ -435,8 +440,13 @@ input:focus {
 }
 
 .log-list::-webkit-scrollbar-thumb {
-  background: var(--glass-border-bright);
+  background: var(--primary);
+  /* More prominent lime color */
   border-radius: 10px;
+}
+
+.log-list::-webkit-scrollbar-thumb:hover {
+  background: #fff;
 }
 
 .log-entry {
