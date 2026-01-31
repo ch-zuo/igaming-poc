@@ -384,10 +384,9 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: calc(100vh - 80px);
-  /* Slightly taller */
-  max-height: 900px;
-  /* Cap it for very large screens if needed */
+  height: calc(100vh - 48px);
+  /* More height */
+  max-height: 950px;
   position: sticky;
   top: 24px;
 }
@@ -423,11 +422,13 @@ input:focus {
 .log-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px;
   display: flex;
   flex-direction: column;
-  /* Ordered by JS */
   gap: 8px;
+  min-height: 0;
+  /* Critical for flex scrolling */
 }
 
 /* Custom Scrollbar */
@@ -455,6 +456,8 @@ input:focus {
   overflow: hidden;
   font-size: 0.85rem;
   transition: all 0.2s;
+  flex-shrink: 0;
+  /* Prevent entries from squishing when many logs exist */
 }
 
 .log-entry-header {
