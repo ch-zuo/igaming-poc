@@ -3,10 +3,11 @@ import axios from 'axios';
 import ActivitySidebar from './ActivitySidebar';
 import { getBalance, getBonusList, updateUser, creditBonus, triggerRegistration, logout as apiLogout } from '../services/api';
 
-// Global Singleton Guard for Fast Track (v1.5)
+// Global Singleton Guard for Fast Track (v1.7)
 let isFTScriptLoaded = false;
 let isFTLibraryInitializing = false;
-let lastInitializedFTToken = null; // Track if we've already initialized this specific token
+let isFTConnectInProgress = false; // Module-level lock
+let lastInitializedFTToken = null;
 
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
@@ -94,35 +95,44 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         const savedSecret = user.ft_jwt_secret;
 
         if (!savedBrand || !savedOrigin || !savedSecret) return;
+
+        // v1.7: Local ref prevents re-run during same mount
         if (ftInitRef.current) return;
 
         const initFastTrack = async () => {
+            // v1.7: Global lock prevents re-run across ALL mounts in same page session
+            if (isFTConnectInProgress) return;
+
             try {
                 ftInitRef.current = true;
-                console.log('[FT OnSite][v1.6] Start Init Flow...');
 
                 // 1. Get the fresh JWT token
                 const { data } = await axios.get('/api/ft-token', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
+                // Check if this token is already handled globally
+                if (lastInitializedFTToken === data.token) {
+                    console.log('[FT OnSite] Token already initialized globally (v1.7)');
+                    return;
+                }
+
+                isFTConnectInProgress = true;
+                console.log('[FT OnSite][v1.7] Start Init Flow (Singleton)...');
+
                 const runInit = () => {
                     if (window.FasttrackCrm) {
-                        // v1.6: Strict Token Singleton
-                        if (lastInitializedFTToken === data.token) {
-                            console.log('[FT OnSite] Token already initialized (v1.6 guard)');
-                            return;
-                        }
-
                         lastInitializedFTToken = data.token;
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized (v1.6)');
+                        console.log('[FT OnSite] Success: Initialized (v1.7)');
                         setIsFTInitialized(true);
                         setStatus('Fast Track Ready!');
+                        // Release lock after success to allow future re-authentication if token changes
+                        isFTConnectInProgress = false;
                     }
                 };
 
-                // 2. Synchronous Configuration (Pre-set globals)
+                // 2. Synchronous Configuration
                 window.fasttrackbrand = savedBrand;
                 window.source = savedOrigin;
                 window.fasttrack = {
@@ -132,14 +142,14 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     inbox: { enable: true }
                 };
 
-                // 3. Handle Loader Singleton
+                // 3. Handle Script/Loader Presence
                 if (window.FasttrackCrm) {
                     runInit();
                 } else if (isFTScriptLoaded || isFTLibraryInitializing) {
                     const checkInterval = setInterval(() => {
                         if (window.FasttrackCrm) {
                             clearInterval(checkInterval);
-                            setTimeout(runInit, 1000); // Wait for lib to settle
+                            setTimeout(runInit, 1000);
                         }
                     }, 500);
                 } else {
@@ -154,7 +164,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         isFTLibraryInitializing = false;
                         if (window.FastTrackLoader && !window.FasttrackCrm) {
                             new window.FastTrackLoader();
-                            setTimeout(runInit, 2000); // v1.6: Increased settle time
+                            setTimeout(runInit, 2000); // 2s settle time
                         } else {
                             setTimeout(runInit, 1000);
                         }
@@ -164,6 +174,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
             } catch (err) {
                 console.error('[FT OnSite] Init Error:', err);
                 ftInitRef.current = false;
+                isFTConnectInProgress = false;
             }
         };
 
