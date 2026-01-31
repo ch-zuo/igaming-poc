@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const supabaseService = require('../services/supabase');
 const ftService = require('../services/ft-integration');
 
@@ -609,6 +610,32 @@ router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) =>
 // New endpoint to fetch Backend <=> FT activities
 router.get('/activities', async (req, res) => {
     res.json(ftService.getActivities());
+});
+
+/**
+ * NEW: GET /ft-token
+ * Generates a JWT token for Fast Track On-Site Notifications.
+ */
+router.get('/ft-token', authenticateUser, async (req, res) => {
+    const { user } = req;
+
+    // User settings should ideally contain the secret
+    // For this PoC, we'll check user settings or use a fallback for now.
+    const secret = user.ft_jwt_secret || process.env.FT_JWT_SECRET || 'your-256-bit-secret';
+
+    const payload = {
+        user_id: user.user_id || user.id,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour expiry
+    };
+
+    try {
+        const token = jwt.sign(payload, secret);
+        res.json({ token });
+    } catch (error) {
+        console.error('[JWT Error]', error);
+        res.status(500).json({ error: 'Failed to generate FT token' });
+    }
 });
 
 module.exports = router;

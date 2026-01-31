@@ -1,0 +1,158 @@
+Front End Implementation
+This page will cover how to install the Front End Javascript as a bare minimum on your
+Front End site.
+Follow below steps to start implementing the Front End Library
+
+Step 1: Generate the token
+Start with generate the JWT token to be used with Fast Track On Site flow. It should be
+generated using official JWT practices which can be read about here https://jwt.io/ and here
+https://jwt.io/introduction.
+Add a claim in the JWT for the user_id as well.
+
+Example JWT Token payload claims:
+{
+ "user_id": "abc123",
+ "iat": 1516239022,
+ "exp": 1516249022
+}
+
+After you have signed your JWT Token with a 256-bit secret, share the secret with Fast
+Track so that the integrity of the token can be validated on Fast Track side.
+
+Step 2: Adding the Javascript
+This is the Javascript you need to add as high up as possible on your page, ideally in the
+header.
+
+In below script there is three things you need to replace:
+1. Replace the window.fasttrackbrand with the brand name you were given from your
+Integration Manager. This is going to be a hard coded value that is going to be the
+same for your brand both for staging and production.
+
+2. At the bottom of below script there is a property called fastTrackCrmScript.src. This
+one has two different values that you are supposed to use; one for staging and one
+for production. Make sure you use the correct one depending on your current
+environment.
+
+<script>
+window.fasttrackbrand = "brand_name"; // REPLACE THIS!
+window.source = "origin" // REPLACE THIS With brand name
+/ origin key
+// This is the main configuration object
+window.fasttrack = {
+enableJWT: true,
+tokenLocation: "local_storage.user_jwt",
+integrationVersion: 1.1,
+autoInit: true,
+inbox: {
+enable: true
+}
+};
+var fastTrackCrmScript =
+document.createElement('script');
+fastTrackCrmScript.async = true;
+fastTrackCrmScript.onload = function () {
+new window.FastTrackLoader();
+}
+// This loader URL is for staging:
+fastTrackCrmScript.src =
+`https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=$
+{new Date().setHours(0, 0, 0, 0)}`;
+document.addEventListener('DOMContentLoaded', function()
+{
+document.body.appendChild(fastTrackCrmScript);
+});
+</script>
+
+If you are running with autoInit : false then you can provide the JWT token as first
+parameter in the init function, like below:
+
+window.FasttrackCrm.init("jwt_token_here");
+
+Step 3: Adding the HTML
+Mandatory: The main div that will hold the HTML / Markdown for the On Site Notifications
+and Rich Inbox is this element:
+
+<div id="fasttrack-crm"></div>
+
+Place this element as high up as possible in your HTML document, ideally directly after you
+open the <body> tag. Regardless if you only use On Site Notifications and / or the Rich
+Inbox; you need this div.
+
+✅ Done with On Site Notifications!
+You have now implemented the bare minimum for using the On Site Notifications on your
+front end. Please proceed if you want to implement support for the Rich Inbox as well ⬇️
+
+Implementing support for Rich Inbox
+
+As you might have seen the above code example have two tabs; one showing an example
+of only enabling the On Site Notifications, and one example enabling BOTH On Site
+Notifications AND Rich Inbox. They are both in the same library but for enabling the Rich
+Inbox you need to take a few additional steps:
+1. Enable the feature Rich Inbox in the main configuration object (look at above code
+example)
+2. Add a two more HTML elements to your Front End code. The div you added to your
+page with id fasttrack-crm has capability of showing the inbox itself, but in most
+cases you'll want some kind of indicator on your page indicating how many unread
+messages the user have in their inbox. Probably you also want a button which will
+open / close the inbox.
+
+Here we see an example of a button which has a child span element holding the count of
+unread messages. The Javascript library will hide the span element for the unread count if
+the unread count is zero.
+
+<button onclick="window.FasttrackCrm.toggleInbox();">
+ Inbox <span id="ft-crm-inbox-badge">0</span>
+</button>
+
+When clicking the button, the function window.FasttrackCrm.toggleInbox() is called. This
+function will open the Rich Inbox if it is closed.
+
+✅ Done with Rich Inbox
+If you have come this far you have implemented both the On Site Notifications and the Rich
+Inbox.
+
+Step 3: Apply your own Design
+If you want to override the styles in the inbox, all styles should be wrapped within the CSS
+id #fasttrack-crm. That protects your sites CSS and allows you to easily target CSS
+classes in the inbox. Place a block of CSS above the invocation of the integration script.
+
+Example
+<style type="text/css">
+#fasttrack-crm .cta-button {
+ background-color:red;
+ color:black;
+}
+
+#fasttrack-crm .cta-button.secondary {
+ background-color:lime;
+ color:white;
+}
+</style>
+
+If you want, you can style the notifications differently based on whether it is an On Site
+Notification or a Rich Inbox Message. You can also style the entire inbox message /
+shoutout view or style the list of inbox messages depending on if they are read or unread.
+Here are some CSS examples:
+
+/* Inbox Notification: */
+#fasttrack-crm .notification-small.ft-notification-type-inbox {
+ background-color: red;
+}
+/* On Site Notification: */
+#fasttrack-crm .notification-small.ft-notification-type-message {
+ background-color: lime;
+}
+/* Shoutout notification: */
+#fasttrack-crm .selected-message.ft-notification-type-shoutout {
+ background-color: brown;
+}
+/* Inbox List item read / unread */
+#fasttrack-crm li.message.is_read {
+ opacity:.5;
+}
+#fasttrack-crm li.message.is_unread {
+ background-color: red;
+}
+/* Opened up inbox message: */
+#fasttrack-crm .selected-message.ft-notification-type-inbox {
+ background-color: blue;

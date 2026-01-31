@@ -16,6 +16,12 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [inboundLogs, setInboundLogs] = useState([]);
     const [outboundLogs, setOutboundLogs] = useState([]);
 
+    // Brand Settings for Fast Track On-Site
+    const [brandName, setBrandName] = useState(user.ft_brand_name || '');
+    const [origin, setOrigin] = useState(user.ft_origin || '');
+    const [jwtSecret, setJwtSecret] = useState(user.ft_jwt_secret || '');
+    const [unreadCount, setUnreadCount] = useState(0);
+
     // Poll for Backend <=> FT Activities (Source of Truth)
     useEffect(() => {
         const fetchActivities = async () => {
@@ -54,6 +60,65 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         const interval = setInterval(fetchActivities, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    // Fast Track On-Site Initializer
+    useEffect(() => {
+        if (!brandName || !origin || !jwtSecret) return;
+
+        const initFastTrack = async () => {
+            try {
+                // 1. Get the JWT token from our backend
+                const { data } = await axios.get('/api/ft-token', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                // 2. Configure Fast Track
+                window.fasttrackbrand = brandName;
+                window.source = origin;
+                window.fasttrack = {
+                    enableJWT: true,
+                    integrationVersion: 1.1,
+                    autoInit: false, // We'll manually init with the token
+                    inbox: { enable: true }
+                };
+
+                // 3. Load the script
+                const script = document.createElement('script');
+                script.async = true;
+                script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
+
+                script.onload = () => {
+                    if (window.FastTrackLoader) {
+                        new window.FastTrackLoader();
+                        // Wait a bit for the library to be ready, then init
+                        setTimeout(() => {
+                            if (window.FasttrackCrm) {
+                                window.FasttrackCrm.init(data.token);
+                                console.log('[FT OnSite] Initialized with token');
+                            }
+                        }, 1000);
+                    }
+                };
+
+                document.body.appendChild(script);
+
+                // 4. Set up unread count listener (if library supports it or via badge)
+                const badgeInterval = setInterval(() => {
+                    const badge = document.getElementById('ft-crm-inbox-badge');
+                    if (badge) setUnreadCount(parseInt(badge.innerText) || 0);
+                }, 2000);
+
+                return () => {
+                    document.body.removeChild(script);
+                    clearInterval(badgeInterval);
+                };
+            } catch (err) {
+                console.error('[FT OnSite] Init Error:', err);
+            }
+        };
+
+        initFastTrack();
+    }, [brandName, origin, jwtSecret, token]);
 
     // Initial Data Fetch
     useEffect(() => {
@@ -152,6 +217,21 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         }
     };
 
+    const handleUpdateBrandSettings = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await updateUser(token, {
+                ft_brand_name: brandName,
+                ft_origin: origin,
+                ft_jwt_secret: jwtSecret
+            });
+            setUser(res.user);
+            setStatus('Brand settings saved! Fast Track re-initializing...');
+        } catch (err) {
+            setStatus('Failed to save brand settings');
+        }
+    };
+
     const handlePlayRound = async () => {
         try {
             setStatus('Spinning...');
@@ -195,6 +275,18 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    {/* Fast Track Inbox Button */}
+                    <button
+                        className="btn-outline inbox-btn"
+                        onClick={() => window.FasttrackCrm?.toggleInbox()}
+                        style={{ position: 'relative', padding: '8px 20px' }}
+                    >
+                        Inbox
+                        <span id="ft-crm-inbox-badge" className={`inbox-badge ${unreadCount > 0 ? 'active' : ''}`}>
+                            {unreadCount}
+                        </span>
+                    </button>
+
                     <div style={{ textAlign: 'right' }}>
                         <p style={{ fontWeight: 700 }}>{user.username}</p>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Player Status: VIP</p>
@@ -202,6 +294,9 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     <button className="btn-outline" onClick={handleLogoutSim} style={{ padding: '8px 16px' }}>Logout</button>
                 </div>
             </header>
+
+            {/* Fast Track Mandatory Container */}
+            <div id="fasttrack-crm"></div>
 
             <div className="grid-layout">
                 <div className="span-two">
@@ -284,6 +379,27 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                                         </div>
                                     )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available.</p>}
                                 </div>
+                            </section>
+
+                            <section className="glass-panel">
+                                <div className="section-header">
+                                    <h3>🏷️ Brand Configuration</h3>
+                                </div>
+                                <form onSubmit={handleUpdateBrandSettings} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>Brand Name</label>
+                                        <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. neostrike_dev" />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>Origin / Source</label>
+                                        <input type="text" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="e.g. igaming-poc" />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>JWT Secret (256-bit)</label>
+                                        <input type="password" value={jwtSecret} onChange={(e) => setJwtSecret(e.target.value)} placeholder="Secret shared with FT" />
+                                    </div>
+                                    <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '8px' }}>Save & Init On-Site</button>
+                                </form>
                             </section>
                         </div>
                     </div>
