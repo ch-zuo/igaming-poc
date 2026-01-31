@@ -26,6 +26,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [bonuses, setBonuses] = useState([]);
     const [inboundLogs, setInboundLogs] = useState([]);
     const [outboundLogs, setOutboundLogs] = useState([]);
+    const [wsLogs, setWsLogs] = useState([]); // v1.9: Track WebSocket events
 
     // Brand Settings for Fast Track On-Site
     const [brandName, setBrandName] = useState(user?.ft_brand_name || '');
@@ -128,15 +129,34 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     if (window.FasttrackCrm) {
                         state.lastInitializedFTToken = data.token;
 
-                        // v1.8: Add explicit handlers BEFORE init to catch the incoming message crash
-                        window.FasttrackCrm.onNotification = (n) => console.log('[FT OnSite] Notification Received:', n);
-                        window.FasttrackCrm.onMessage = (m) => console.log('[FT OnSite] Message Received:', m);
-                        window.FasttrackCrm.onError = (e) => console.error('[FT OnSite] Library Error:', e);
+                        // v1.9: Log WebSocket events directly to the UI sidebar
+                        const logWS = (type, payload) => {
+                            setWsLogs(prev => [{
+                                method: 'WS',
+                                endpoint: type,
+                                status: 'RECEIVED',
+                                payload: JSON.stringify(payload, null, 2),
+                                timestamp: new Date().toISOString()
+                            }, ...prev].slice(0, 5)); // Keep last 5 WS events
+                        };
+
+                        window.FasttrackCrm.onNotification = (n) => {
+                            console.log('[FT OnSite] Notification:', n);
+                            logWS('NOTIFICATION', n);
+                        };
+                        window.FasttrackCrm.onMessage = (m) => {
+                            console.log('[FT OnSite] Message:', m);
+                            logWS('MESSAGE', m);
+                        };
+                        window.FasttrackCrm.onError = (e) => {
+                            console.error('[FT OnSite] Library Error:', e);
+                            logWS('ERROR', e);
+                        };
 
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized (v1.8)');
+                        console.log('[FT OnSite] Success: Initialized (v1.9)');
                         setIsFTInitialized(true);
-                        setStatus('Fast Track Ready (v1.8)');
+                        setStatus('Fast Track Ready (v1.9)');
                         state.isFTConnectInProgress = false;
                     }
                 };
@@ -495,7 +515,10 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     </div>
                 </div>
 
-                <ActivitySidebar inboundLogs={inboundLogs} outboundLogs={outboundLogs} />
+                <ActivitySidebar
+                    inboundLogs={[...wsLogs, ...inboundLogs]}
+                    outboundLogs={outboundLogs}
+                />
             </div>
         </div >
     );
