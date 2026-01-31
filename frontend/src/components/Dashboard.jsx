@@ -73,6 +73,14 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         return () => clearInterval(interval);
     }, []);
 
+    // Clear status message after 5 seconds
+    useEffect(() => {
+        if (status !== 'Dashboard Ready' && !status.includes('Spinning')) {
+            const timer = setTimeout(() => setStatus('Dashboard Ready'), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [status]);
+
     // Fast Track On-Site Initializer
     useEffect(() => {
         // Only run if we HAVE settings and we HAVEN'T initialized yet
@@ -426,7 +434,14 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                                         <label>JWT Secret (256-bit)</label>
                                         <input type="password" value={jwtSecret} onChange={(e) => setJwtSecret(e.target.value)} placeholder="Secret shared with FT" />
                                     </div>
-                                    <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '8px' }}>Save & Init On-Site</button>
+                                    <button
+                                        type="submit"
+                                        className="btn-primary"
+                                        style={{ width: '100%', marginTop: '8px', opacity: (brandName === user.ft_brand_name && origin === user.ft_origin && jwtSecret === user.ft_jwt_secret) ? 0.6 : 1 }}
+                                        disabled={brandName === user.ft_brand_name && origin === user.ft_origin && jwtSecret === user.ft_jwt_secret}
+                                    >
+                                        {(brandName === user.ft_brand_name && origin === user.ft_origin && jwtSecret === user.ft_jwt_secret) ? 'Settings Saved' : 'Save & Init On-Site'}
+                                    </button>
                                 </form>
                             </section>
                         </div>
