@@ -29,6 +29,8 @@ function Dashboard({ user: initialUser, token, onLogout }) {
             setBrandName(user.ft_brand_name || '');
             setOrigin(user.ft_origin || '');
             setJwtSecret(user.ft_jwt_secret || '');
+            setFirstName(user.first_name || '');
+            setLastName(user.last_name || '');
         }
     }, [user]);
 
