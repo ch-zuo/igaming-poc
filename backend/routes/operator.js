@@ -628,7 +628,7 @@ router.get('/ft-token', authenticateUser, async (req, res) => {
     // Ensure user_id is a string and payload is clean
     const payload = {
         user_id: String(user.user_id || user.id),
-        iat: Math.floor(Date.now() / 1000),
+        iat: Math.floor(Date.now() / 1000) - 60, // 1 min ago for clock drift
         exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour expiry
     };
 
