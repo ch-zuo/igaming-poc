@@ -21,6 +21,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [origin, setOrigin] = useState(user.ft_origin || '');
     const [jwtSecret, setJwtSecret] = useState(user.ft_jwt_secret || '');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isFTInitialized, setIsFTInitialized] = useState(false);
 
     // Poll for Backend <=> FT Activities (Source of Truth)
     useEffect(() => {
@@ -63,38 +64,54 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
     // Fast Track On-Site Initializer
     useEffect(() => {
-        if (!brandName || !origin || !jwtSecret) return;
+        // Only run if we HAVE settings and we HAVEN'T initialized yet
+        // OR if the user object itself changes (meaning we just saved)
+        const savedBrand = user.ft_brand_name;
+        const savedOrigin = user.ft_origin;
+        const savedSecret = user.ft_jwt_secret;
+
+        if (!savedBrand || !savedOrigin || !savedSecret) return;
 
         const initFastTrack = async () => {
             try {
+                // Prevent duplicate scripts
+                const oldScript = document.getElementById('ft-onsite-script');
+                if (oldScript) {
+                    setIsFTInitialized(true);
+                    return;
+                }
+
+                console.log('[FT OnSite] Initializing...');
+
                 // 1. Get the JWT token from our backend
                 const { data } = await axios.get('/api/ft-token', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
                 // 2. Configure Fast Track
-                window.fasttrackbrand = brandName;
-                window.source = origin;
+                window.fasttrackbrand = savedBrand;
+                window.source = savedOrigin;
                 window.fasttrack = {
                     enableJWT: true,
                     integrationVersion: 1.1,
-                    autoInit: false, // We'll manually init with the token
+                    autoInit: false,
                     inbox: { enable: true }
                 };
 
                 // 3. Load the script
                 const script = document.createElement('script');
+                script.id = 'ft-onsite-script';
                 script.async = true;
                 script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
 
                 script.onload = () => {
                     if (window.FastTrackLoader) {
                         new window.FastTrackLoader();
-                        // Wait a bit for the library to be ready, then init
                         setTimeout(() => {
                             if (window.FasttrackCrm) {
                                 window.FasttrackCrm.init(data.token);
                                 console.log('[FT OnSite] Initialized with token');
+                                setIsFTInitialized(true);
                             }
                         }, 1000);
                     }
@@ -102,14 +119,12 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
                 document.body.appendChild(script);
 
-                // 4. Set up unread count listener (if library supports it or via badge)
                 const badgeInterval = setInterval(() => {
                     const badge = document.getElementById('ft-crm-inbox-badge');
                     if (badge) setUnreadCount(parseInt(badge.innerText) || 0);
                 }, 2000);
 
                 return () => {
-                    document.body.removeChild(script);
                     clearInterval(badgeInterval);
                 };
             } catch (err) {
@@ -118,7 +133,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         };
 
         initFastTrack();
-    }, [brandName, origin, jwtSecret, token]);
+    }, [user.ft_brand_name, user.ft_origin, user.ft_jwt_secret, token]);
 
     // Initial Data Fetch
     useEffect(() => {

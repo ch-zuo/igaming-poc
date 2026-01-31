@@ -620,17 +620,23 @@ router.get('/ft-token', authenticateUser, async (req, res) => {
     const { user } = req;
 
     // User settings should ideally contain the secret
-    // For this PoC, we'll check user settings or use a fallback for now.
     const secret = user.ft_jwt_secret || process.env.FT_JWT_SECRET || 'your-256-bit-secret';
 
+    // Ensure user_id is a string and payload is clean
     const payload = {
-        user_id: user.user_id || user.id,
+        user_id: String(user.user_id || user.id),
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour expiry
     };
 
     try {
-        const token = jwt.sign(payload, secret);
+        // Sign with explicit HS256 and typ: JWT header
+        const token = jwt.sign(payload, secret, {
+            algorithm: 'HS256',
+            header: { typ: 'JWT', alg: 'HS256' }
+        });
+
+        console.log(`[FT JWT] Generated for user ${payload.user_id}`);
         res.json({ token });
     } catch (error) {
         console.error('[JWT Error]', error);
