@@ -22,7 +22,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [jwtSecret, setJwtSecret] = useState(user?.ft_jwt_secret || '');
     const [unreadCount, setUnreadCount] = useState(0);
     const [isFTInitialized, setIsFTInitialized] = useState(false);
-    const ftBusyRef = useRef(false);
+    const ftInitRef = useRef(false);
 
     // Sync state if user prop changes (e.g. after login or update)
     useEffect(() => {
@@ -84,81 +84,77 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
     // Fast Track On-Site Initializer
     useEffect(() => {
-        const savedBrand = user?.ft_brand_name;
-        const savedOrigin = user?.ft_origin;
-        const savedSecret = user?.ft_jwt_secret;
+        const savedBrand = user.ft_brand_name;
+        const savedOrigin = user.ft_origin;
+        const savedSecret = user.ft_jwt_secret;
 
-        if (!savedBrand || !savedOrigin || !savedSecret || ftBusyRef.current) return;
+        if (!savedBrand || !savedOrigin || !savedSecret) return;
+
+        // Strict guard: don't init if already in progress or completed
+        if (ftInitRef.current) return;
 
         const initFastTrack = async () => {
-            if (ftBusyRef.current || window.FasttrackCrm) return;
-            ftBusyRef.current = true;
-
             try {
-                console.log('[FT OnSite] Initializing SDK...');
+                ftInitRef.current = true; // Mark as started immediately
+
+                // Prevent duplicate script elements
+                if (document.getElementById('ft-onsite-script')) {
+                    setIsFTInitialized(true);
+                    return;
+                }
+
+                console.log('[FT OnSite] Initializing singleton...');
 
                 // 1. Get the JWT token
                 const { data } = await axios.get('/api/ft-token', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                // 2. Configure
+                // 2. Configure globals
                 window.fasttrackbrand = savedBrand;
                 window.source = savedOrigin;
                 window.fasttrack = {
                     enableJWT: true,
                     integrationVersion: 1.1,
-                    autoInit: false,
+                    autoInit: false, // Mandatory for manual init(token)
                     inbox: { enable: true }
                 };
 
-                // 3. Load script if not exists
-                if (!document.getElementById('ft-onsite-script')) {
-                    const script = document.createElement('script');
-                    script.id = 'ft-onsite-script';
-                    script.async = true;
-                    script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
-                    document.body.appendChild(script);
+                // 3. Load script
+                const script = document.createElement('script');
+                script.id = 'ft-onsite-script';
+                script.async = true;
+                script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
 
-                    await new Promise((resolve) => {
-                        script.onload = resolve;
-                    });
-                }
+                script.onload = () => {
+                    if (window.FastTrackLoader && !window.FasttrackCrm) {
+                        new window.FastTrackLoader();
+                        setTimeout(() => {
+                            if (window.FasttrackCrm) {
+                                window.FasttrackCrm.init(data.token);
+                                console.log('[FT OnSite] Success: Authenticated and Connected');
+                                setIsFTInitialized(true);
+                                setStatus('Fast Track Ready!');
+                            }
+                        }, 1000);
+                    }
+                };
 
-                // 4. Initialize Instance
-                if (window.FastTrackLoader && !window.FasttrackCrm) {
-                    new window.FastTrackLoader();
-                }
+                document.body.appendChild(script);
 
-                // Wait for FasttrackCrm to be available
-                let attempts = 0;
-                while (!window.FasttrackCrm && attempts < 10) {
-                    await new Promise(r => setTimeout(r, 500));
-                    attempts++;
-                }
+                const badgeInterval = setInterval(() => {
+                    const badge = document.getElementById('ft-crm-inbox-badge');
+                    if (badge) setUnreadCount(parseInt(badge.innerText) || 0);
+                }, 2000);
 
-                if (window.FasttrackCrm) {
-                    window.FasttrackCrm.init(data.token);
-                    console.log('[FT OnSite] SDK Initialized');
-                    setIsFTInitialized(true);
-                }
+                return () => clearInterval(badgeInterval);
             } catch (err) {
                 console.error('[FT OnSite] Init Error:', err);
-            } finally {
-                ftBusyRef.current = false;
+                ftInitRef.current = false; // Allow retry on error
             }
         };
 
-        const badgeInterval = setInterval(() => {
-            const badge = document.getElementById('ft-crm-inbox-badge');
-            if (badge) setUnreadCount(parseInt(badge.innerText) || 0);
-        }, 2000);
-
         initFastTrack();
-
-        return () => {
-            clearInterval(badgeInterval);
-        };
     }, [user.ft_brand_name, user.ft_origin, user.ft_jwt_secret, token]);
 
     // Initial Data Fetch
