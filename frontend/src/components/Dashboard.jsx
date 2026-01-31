@@ -280,21 +280,23 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         return res.data;
     };
 
+    if (!user) return <div className="loading">Loading user session...</div>;
+
     return (
         <div className="dashboard">
             <header>
                 <div>
                     <h1 className="logo-text">NeoStrike</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        ID: <span style={{ color: 'var(--accent-blue)' }}>{user.user_id || user.id}</span>
+                        ID: <span style={{ color: 'var(--accent-blue)' }}>{user?.user_id || user?.id || '---'}</span>
                     </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                     {/* Fast Track Inbox Button */}
                     <button
-                        className="btn-outline inbox-btn"
+                        className="btn-outline"
                         onClick={() => window.FasttrackCrm?.toggleInbox()}
-                        style={{ position: 'relative', padding: '8px 20px' }}
+                        style={{ position: 'relative', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         Inbox
                         <span id="ft-crm-inbox-badge" className={`inbox-badge ${unreadCount > 0 ? 'active' : ''}`}>
@@ -303,7 +305,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     </button>
 
                     <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontWeight: 700 }}>{user.username}</p>
+                        <p style={{ fontWeight: 700 }}>{user?.username || 'Guest'}</p>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Player Status: VIP</p>
                     </div>
                     <button className="btn-outline" onClick={handleLogoutSim} style={{ padding: '8px 16px' }}>Logout</button>

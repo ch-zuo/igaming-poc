@@ -287,12 +287,15 @@ router.post('/logout', authenticateUser, async (req, res) => {
  * Updates user profile and triggers user_update event to FT.
  */
 router.post('/user/update', authenticateUser, async (req, res) => {
-    const { first_name, last_name, email } = req.body;
+    const { first_name, last_name, email, ft_brand_name, ft_origin, ft_jwt_secret } = req.body;
 
     const updates = {};
     if (first_name) updates.first_name = first_name;
     if (last_name) updates.last_name = last_name;
     if (email) updates.email = email;
+    if (ft_brand_name) updates.ft_brand_name = ft_brand_name;
+    if (ft_origin) updates.ft_origin = ft_origin;
+    if (ft_jwt_secret) updates.ft_jwt_secret = ft_jwt_secret;
 
     try {
         const updatedUser = await supabaseService.updateUser(req.user.id, updates);
