@@ -1,87 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import {
-    getBalance,
-    deposit,
-    placeBet,
-    getBonusList,
-    creditBonus,
-    triggerRegistration,
-    updateUser,
-    logout as apiLogout
-} from '../services/api';
 import axios from 'axios';
 import ActivitySidebar from './ActivitySidebar';
+import { getBalance, getBonusList, updateUser, creditBonus, triggerRegistration, logout as apiLogout } from '../services/api';
 
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
     const [balance, setBalance] = useState(0);
     const [bonusBalance, setBonusBalance] = useState(0);
     const [currency, setCurrency] = useState('EUR');
-    const [status, setStatus] = useState('System ready');
-    const [bonuses, setBonuses] = useState([]);
-    const [marketingOpted, setMarketingOpted] = useState(true);
-
+    const [status, setStatus] = useState('Dashboard Ready');
     const [firstName, setFirstName] = useState(user.first_name || '');
     const [lastName, setLastName] = useState(user.last_name || '');
-
+    const [marketingOpted, setMarketingOpted] = useState(true);
+    const [bonuses, setBonuses] = useState([]);
     const [inboundLogs, setInboundLogs] = useState([]);
     const [outboundLogs, setOutboundLogs] = useState([]);
 
-    const addLog = (type, log) => {
-        const newLog = {
-            id: Date.now() + Math.random(),
-            timestamp: new Date().toISOString(),
-            ...log
-        };
-        if (type === 'inbound') {
-            setInboundLogs(prev => [newLog, ...prev].slice(0, 50));
-        } else {
-            setOutboundLogs(prev => [newLog, ...prev].slice(0, 50));
-        }
-    };
-
-    // Axios Interceptor for Outbound Logging
+    // Poll for Backend <=> FT Activities (Source of Truth)
     useEffect(() => {
-        const reqInterceptor = axios.interceptors.request.use((config) => {
-            // We'll log the response instead to get the full picture, 
-            // but we can track the start here if needed.
-            return config;
-        });
+        const fetchActivities = async () => {
+            try {
+                const response = await axios.get('/api/activities');
+                const activities = response.data;
 
-        const resInterceptor = axios.interceptors.response.use(
-            (response) => {
-                addLog('outbound', {
-                    method: response.config.method.toUpperCase(),
-                    endpoint: response.config.url,
-                    status: response.status,
-                    payload: {
-                        request: response.config.data ? JSON.parse(response.config.data) : null,
-                        response: response.data
-                    }
-                });
-                return response;
-            },
-            (error) => {
-                addLog('outbound', {
-                    method: error.config?.method?.toUpperCase() || 'UNKNOWN',
-                    endpoint: error.config?.url || 'UNKNOWN',
-                    status: error.response?.status || 500,
-                    payload: {
-                        error: error.message,
-                        details: error.response?.data
-                    }
-                });
-                return Promise.reject(error);
+                const inbound = activities
+                    .filter(a => a.type === 'inbound')
+                    .map(a => ({
+                        method: a.method,
+                        endpoint: a.endpoint,
+                        status: a.status,
+                        payload: a.payload,
+                        timestamp: a.timestamp
+                    }));
+
+                const outbound = activities
+                    .filter(a => a.type === 'outbound')
+                    .map(a => ({
+                        method: a.method,
+                        endpoint: a.endpoint,
+                        status: a.status,
+                        payload: a.payload,
+                        timestamp: a.timestamp
+                    }));
+
+                setInboundLogs(inbound);
+                setOutboundLogs(outbound);
+            } catch (error) {
+                console.error('Failed to fetch activity logs:', error);
             }
-        );
-
-        return () => {
-            axios.interceptors.request.eject(reqInterceptor);
-            axios.interceptors.response.eject(resInterceptor);
         };
+
+        fetchActivities();
+        const interval = setInterval(fetchActivities, 3000);
+        return () => clearInterval(interval);
     }, []);
 
-
+    // Initial Data Fetch
     useEffect(() => {
         fetchBalance();
         loadBonuses();
@@ -118,13 +92,15 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         }
     };
 
+    const deposit = async (token, amount) => {
+        const res = await axios.post('/api/deposit', { amount }, { headers: { Authorization: `Bearer ${token}` } });
+        return res.data;
+    };
+
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
         try {
-            const res = await updateUser(token, {
-                first_name: firstName,
-                last_name: lastName
-            });
+            const res = await updateUser(token, { first_name: firstName, last_name: lastName });
             setUser(res.user);
             setStatus('Profile updated & FT event sent!');
         } catch (err) {
@@ -137,12 +113,9 @@ function Dashboard({ user: initialUser, token, onLogout }) {
             const newVal = !marketingOpted;
             setMarketingOpted(newVal);
             await axios.put('/api/userconsents/' + user.user_id, {
-                consents: [
-                    { opted_in: newVal, type: 'email' },
-                    { opted_in: newVal, type: 'sms' }
-                ]
+                consents: [{ opted_in: newVal, type: 'email' }, { opted_in: newVal, type: 'sms' }]
             }, { headers: { Authorization: `Bearer ${token}` } });
-            setStatus(`Consent [FT Consents] updated: ${newVal ? 'Opted-In' : 'Opted-Out'}`);
+            setStatus(`Consent updated: ${newVal ? 'Opted-In' : 'Opted-Out'}`);
         } catch (err) {
             setStatus('Consent update failed');
         }
@@ -161,32 +134,21 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const handleToggleBlock = async () => {
         try {
             await axios.put('/api/userblocks/' + user.user_id, {
-                blocks: [
-                    { active: true, type: 'Blocked', note: 'PoC Simulation' }
-                ]
+                blocks: [{ active: true, type: 'Blocked', note: 'PoC Simulation' }]
             }, { headers: { Authorization: `Bearer ${token}` } });
-            setStatus('Block [FT Blocks] Event Sent');
+            setStatus('Block Event Sent to FT');
         } catch (err) {
             setStatus('Block simulation failed');
-        }
-    };
-
-    const handleRegistrationSim = async () => {
-        try {
-            await triggerRegistration(token);
-            setStatus('Registration [FT Registration] Event Sent');
-        } catch (err) {
-            setStatus('Registration simulation failed');
         }
     };
 
     const handleLogoutSim = async () => {
         try {
             await apiLogout(token);
-            setStatus('Logout [FT Logout] Event Sent');
-            setTimeout(onLogout, 1500);
+            setStatus('Logging out...');
+            setTimeout(onLogout, 1000);
         } catch (err) {
-            setStatus('Logout simulation failed');
+            setStatus('Logout failed');
         }
     };
 
@@ -194,8 +156,6 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         try {
             setStatus('Spinning...');
             const betRes = await placeBet(token, user.user_id, 10);
-
-            // Sync balances from server response immediately after bet
             setBalance(betRes.balance);
             setBonusBalance(betRes.bonus_balance || 0);
 
@@ -204,19 +164,14 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 if (isWin) {
                     const winAmount = 20;
                     const winRes = await axios.post('/api/credit', {
-                        user_id: user.user_id,
-                        amount: winAmount,
-                        transaction_id: `ctx-${Date.now()}`,
-                        game_id: 'slot-game-1'
+                        user_id: user.user_id, amount: winAmount, transaction_id: `ctx-${Date.now()}`, game_id: 'slot-game-1'
                     }, { headers: { Authorization: `Bearer ${token}` } });
-
-                    // Sync balances from server response after win
                     setBalance(winRes.data.balance);
                     setBonusBalance(winRes.data.bonus_balance || 0);
                     setStatus('BIG WIN: 20!');
                 } else {
                     setStatus('No Win');
-                    fetchBalance(); // Final sync
+                    fetchBalance();
                 }
             }, 800);
         } catch (err) {
@@ -225,13 +180,18 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         }
     };
 
+    const placeBet = async (token, userId, amount) => {
+        const res = await axios.post('/api/debit', { user_id: userId, amount, transaction_id: `tx-${Date.now()}`, game_id: 'slot-game-1' }, { headers: { Authorization: `Bearer ${token}` } });
+        return res.data;
+    };
+
     return (
         <div className="dashboard">
             <header>
                 <div>
                     <h1 className="logo-text">NeoStrike</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        ID: <span style={{ color: 'var(--accent-blue)' }}>{user.user_id}</span>
+                        ID: <span style={{ color: 'var(--accent-blue)' }}>{user.user_id || user.id}</span>
                     </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -239,9 +199,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         <p style={{ fontWeight: 700 }}>{user.username}</p>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Player Status: VIP</p>
                     </div>
-                    <button className="btn-outline" onClick={handleLogoutSim} style={{ padding: '8px 16px' }}>
-                        Logout
-                    </button>
+                    <button className="btn-outline" onClick={handleLogoutSim} style={{ padding: '8px 16px' }}>Logout</button>
                 </div>
             </header>
 
@@ -252,7 +210,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                             <label>Real Balance</label>
                             <h2>{balance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
                         </div>
-                        <div className="hero-balance floating bonus-wallet" style={{ borderLeft: '4px solid var(--accent-gold, #ffd700)' }}>
+                        <div className="hero-balance floating bonus-wallet">
                             <label>Bonus Balance</label>
                             <h2>{bonusBalance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
                         </div>
@@ -285,11 +243,11 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                                 <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
                                         <label>First Name</label>
-                                        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" />
+                                        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                                     </div>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
                                         <label>Surname</label>
-                                        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Surname" />
+                                        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                                     </div>
                                     <button type="submit" className="btn-primary" style={{ padding: '14px 24px' }}>Update Profile</button>
                                 </form>
@@ -316,7 +274,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                                 <div className="bonus-list">
                                     {bonuses.length > 0 ? bonuses.map(b => (
                                         <div key={b.value} className="bonus-card">
-                                            <div>
+                                            <div style={{ flex: 1 }}>
                                                 <h4>{b.text}</h4>
                                                 <p>Limited time offer</p>
                                             </div>
@@ -324,7 +282,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                                                 Claim
                                             </button>
                                         </div>
-                                    )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available at the moment.</p>}
+                                    )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available.</p>}
                                 </div>
                             </section>
                         </div>
@@ -338,4 +296,3 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 }
 
 export default Dashboard;
-

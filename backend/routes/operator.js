@@ -39,20 +39,20 @@ const authenticateUser = async (req, res, next) => {
 };
 
 router.post('/authenticate', authenticateUser, async (req, res) => {
-    // If middleware passes, user is authenticated
-    // Push 'login' and 'balance' events to FT
-    await ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() });
-    await ftService.pushEvent(req.user.id, 'balance', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(req.user.id, 'login', { session_id: 'mock-session-' + Date.now() }));
+    telemetry.push(await ftService.pushEvent(req.user.id, 'balance', {
         amount: req.user.balance,
         bonus_amount: req.user.bonus_balance || 0,
         currency: req.user.currency
-    });
+    }));
 
     res.json({
         sid: 'session-' + req.user.id + '-' + Date.now(),
         user_id: req.user.id,
         currency: req.user.currency,
-        origin: PLATFORM_ORIGIN
+        origin: PLATFORM_ORIGIN,
+        _ft_telemetry: telemetry
     });
 });
 
@@ -143,7 +143,8 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
     });
 
     // Push bet and balance events
-    await ftService.pushEvent(user.id, 'bet', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(user.id, 'bet', {
         amount,
         bonus_wager_amount,
         wager_amount: real_wager_amount,
@@ -154,20 +155,21 @@ router.post('/debit', verifyGameProviderOrUser, async (req, res) => {
         balance_after: newBalance,
         bonus_balance_after: newBonusBalance,
         currency: user.currency
-    });
+    }));
 
-    await ftService.pushEvent(user.id, 'balance', {
+    telemetry.push(await ftService.pushEvent(user.id, 'balance', {
         amount: newBalance,
         bonus_amount: newBonusBalance,
         currency: user.currency
-    });
+    }));
 
     res.json({
         transaction_id,
         balance: newBalance,
         bonus_balance: newBonusBalance,
         currency: user.currency,
-        origin: PLATFORM_ORIGIN
+        origin: PLATFORM_ORIGIN,
+        _ft_telemetry: telemetry
     });
 });
 
@@ -190,7 +192,8 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
     await supabaseService.updateUser(user.id, { balance: newBalance });
 
     // Push win and balance events
-    await ftService.pushEvent(user.id, 'win', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(user.id, 'win', {
         amount,
         transaction_id,
         game_id,
@@ -199,20 +202,21 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
         balance_after: newBalance,
         bonus_balance_after: currentBonusBalance,
         currency: user.currency
-    });
+    }));
 
-    await ftService.pushEvent(user.id, 'balance', {
+    telemetry.push(await ftService.pushEvent(user.id, 'balance', {
         amount: newBalance,
         bonus_amount: currentBonusBalance,
         currency: user.currency
-    });
+    }));
 
     res.json({
         transaction_id,
         balance: newBalance,
         bonus_balance: currentBonusBalance,
         currency: user.currency,
-        origin: PLATFORM_ORIGIN
+        origin: PLATFORM_ORIGIN,
+        _ft_telemetry: telemetry
     });
 });
 
@@ -221,12 +225,12 @@ router.post('/credit', verifyGameProviderOrUser, async (req, res) => {
  * Explicitly triggers a registration event to FT.
  */
 router.post('/registration', authenticateUser, async (req, res) => {
-    await ftService.pushEvent(req.user.id, 'registration', {
+    const telemetry = await ftService.pushEvent(req.user.id, 'registration', {
         note: 'User registered via PoC platform',
         user_agent: req.headers['user-agent'],
         ip_address: req.ip
     });
-    res.json({ status: 'success', message: 'Registration event pushed' });
+    res.json({ status: 'success', message: 'Registration event pushed', _ft_telemetry: [telemetry] });
 });
 
 /**
@@ -253,7 +257,7 @@ router.post('/register', async (req, res) => {
         });
 
         // Push 'registration' event to FT
-        await ftService.pushEvent(newUser.id, 'registration', {
+        const telemetry = await ftService.pushEvent(newUser.id, 'registration', {
             note: 'User registered via NeoStrike Gate',
             user_agent: req.headers['user-agent'],
             ip_address: req.ip,
@@ -262,7 +266,7 @@ router.post('/register', async (req, res) => {
             email: newUser.email
         });
 
-        res.json({ status: 'success', user: newUser, token });
+        res.json({ status: 'success', user: newUser, token, _ft_telemetry: [telemetry] });
     } catch (error) {
         res.status(500).json({ error: 'Registration failed', details: error.message });
     }
@@ -273,8 +277,8 @@ router.post('/register', async (req, res) => {
  * Triggers a logout event to FT.
  */
 router.post('/logout', authenticateUser, async (req, res) => {
-    await ftService.pushEvent(req.user.id, 'logout', {});
-    res.json({ status: 'success', message: 'Logout event pushed' });
+    const telemetry = await ftService.pushEvent(req.user.id, 'logout', {});
+    res.json({ status: 'success', message: 'Logout event pushed', _ft_telemetry: [telemetry] });
 });
 
 /**
@@ -292,9 +296,9 @@ router.post('/user/update', authenticateUser, async (req, res) => {
     try {
         const updatedUser = await supabaseService.updateUser(req.user.id, updates);
 
-        await ftService.pushEvent(req.user.id, 'user_update', {});
+        const telemetry = await ftService.pushEvent(req.user.id, 'user_update', {});
 
-        res.json({ status: 'success', user: updatedUser });
+        res.json({ status: 'success', user: updatedUser, _ft_telemetry: [telemetry] });
     } catch (error) {
         res.status(500).json({ error: 'Failed to update user', details: error.message });
     }
@@ -308,20 +312,22 @@ router.post('/deposit', authenticateUser, async (req, res) => {
     const newBalance = req.user.balance + amount;
     await supabaseService.updateBalance(req.user.id, newBalance);
 
-    await ftService.pushEvent(req.user.id, 'deposit', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(req.user.id, 'deposit', {
         amount,
         balance_after: newBalance,
         currency: req.user.currency
-    });
-    await ftService.pushEvent(req.user.id, 'balance', {
+    }));
+    telemetry.push(await ftService.pushEvent(req.user.id, 'balance', {
         amount: newBalance,
         currency: req.user.currency
-    });
+    }));
 
     res.json({
         balance: newBalance,
         currency: req.user.currency,
-        origin: PLATFORM_ORIGIN
+        origin: PLATFORM_ORIGIN,
+        _ft_telemetry: telemetry
     });
 });
 
@@ -338,7 +344,7 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
         return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    const responseData = {
         user_id: user.user_id || user.id,
         username: user.username || `user_${user.id}`,
         first_name: user.first_name || 'John',
@@ -369,7 +375,16 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
             vip_level: 1,
             special_segmentation: "PoC"
         }
+    };
+
+    ftService.logActivity('inbound', {
+        method: 'GET',
+        endpoint: `/userdetails/${userid}`,
+        status: 200,
+        payload: { request: req.query, response: responseData }
     });
+
+    res.json(responseData);
 });
 
 /**
@@ -378,7 +393,7 @@ router.get('/userdetails/:userid', verifyGameProviderOrUser, async (req, res) =>
  */
 router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => {
     // For PoC, we return a compliant blocks object
-    res.json({
+    const responseData = {
         blocks: [
             {
                 active: false,
@@ -391,7 +406,16 @@ router.get('/userblocks/:userid', verifyGameProviderOrUser, async (req, res) => 
                 note: "Not blocked in PoC"
             }
         ]
+    };
+
+    ftService.logActivity('inbound', {
+        method: 'GET',
+        endpoint: `/userblocks/${req.params.userid}`,
+        status: 200,
+        payload: { request: req.query, response: responseData }
     });
+
+    res.json(responseData);
 });
 
 /**
@@ -414,7 +438,7 @@ router.put('/userblocks/:userid', authenticateUser, async (req, res) => {
  */
 router.get('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) => {
     // For PoC, we return standard marketing consents in compliant object format
-    res.json({
+    const responseData = {
         consents: [
             { opted_in: true, type: 'email' },
             { opted_in: true, type: 'sms' },
@@ -423,7 +447,16 @@ router.get('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) =
             { opted_in: true, type: 'siteNotification' },
             { opted_in: true, type: 'pushNotification' }
         ]
+    };
+
+    ftService.logActivity('inbound', {
+        method: 'GET',
+        endpoint: `/userconsents/${req.params.userid}`,
+        status: 200,
+        payload: { request: req.query, response: responseData }
     });
+
+    res.json(responseData);
 });
 
 /**
@@ -436,11 +469,15 @@ router.post('/userconsents/:userid', verifyGameProviderOrUser, async (req, res) 
 
     console.log(`[Operator API] Consents updated for user ${userid}:`, consents);
 
-    // Push 'consents' event to FT
     await ftService.pushEvent(userid, 'consents', { consents });
 
-    // In dynamic PoC, we would update the DB here.
-    // For now, we acknowledge success.
+    ftService.logActivity('inbound', {
+        method: 'POST',
+        endpoint: `/userconsents/${userid}`,
+        status: 200,
+        payload: { request: req.body, response: { status: 'success' } }
+    });
+
     res.json({ status: 'success', origin: PLATFORM_ORIGIN });
 });
 
@@ -473,40 +510,40 @@ router.post('/bonus/credit', verifyGameProviderOrUser, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
-    // In dynamic PoC, validate bonus_code...
-    // For now, we assume fixed $10 reward for any valid code
     const bonusAmount = 10.0;
     const currentBonusBalance = user.bonus_balance || 0;
     const newBonusBalance = currentBonusBalance + bonusAmount;
 
     await supabaseService.updateUser(user.id, { bonus_balance: newBonusBalance });
 
-    // Push 'bonus' event back to FT
-    await ftService.pushEvent(user.id, 'bonus', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(user.id, 'bonus', {
         amount: bonusAmount,
         bonus_code: bonus_code,
         bonus_id: 'POC-BONUS-101',
         status: 'Created',
         type: 'WelcomeBonus',
         currency: user.currency
-    });
+    }));
 
-    // Sync balances (Both Real and Bonus)
-    await ftService.pushEvent(user.id, 'balance', {
+    telemetry.push(await ftService.pushEvent(user.id, 'balance', {
         amount: user.balance,
         bonus_amount: newBonusBalance,
         currency: user.currency
+    }));
+
+    ftService.logActivity('inbound', {
+        method: 'POST',
+        endpoint: '/bonus/credit',
+        status: 200,
+        payload: { request: req.body, response: 'OK' }
     });
 
     res.status(200).send('OK');
 });
 
-/**
- * 5. GET /bonus/list
- * Returns list of available bonuses for FT to display.
- */
 router.get('/bonus/list', verifyGameProviderOrUser, async (req, res) => {
-    res.json({
+    const responseData = {
         "Data": [
             { "text": "Welcome Bonus 100%", "value": "WELCOME100" },
             { "text": "Free Spin Reward", "value": "FREESPIN20" },
@@ -514,13 +551,18 @@ router.get('/bonus/list', verifyGameProviderOrUser, async (req, res) => {
         ],
         "Success": true,
         "Errors": []
+    };
+
+    ftService.logActivity('inbound', {
+        method: 'GET',
+        endpoint: '/bonus/list',
+        status: 200,
+        payload: { request: req.query, response: responseData }
     });
+
+    res.json(responseData);
 });
 
-/**
- * 6. POST /bonus/credit/funds
- * Processes specific monetary bonus crediting from FT.
- */
 router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) => {
     const { user_id, bonus_code, amount, currency } = req.body;
 
@@ -533,30 +575,40 @@ router.post('/bonus/credit/funds', verifyGameProviderOrUser, async (req, res) =>
         return res.status(404).json({ error: 'User not found' });
     }
 
-    // Note: Currency conversion could happen here if currency !== user.currency
     const currentBonusBalance = user.bonus_balance || 0;
     const newBonusBalance = currentBonusBalance + parseFloat(amount);
 
     await supabaseService.updateUser(user.id, { bonus_balance: newBonusBalance });
 
-    // Push 'bonus' event
-    await ftService.pushEvent(user.id, 'bonus', {
+    const telemetry = [];
+    telemetry.push(await ftService.pushEvent(user.id, 'bonus', {
         amount: amount,
         bonus_code: bonus_code || 'FUNDS-REWARD',
         bonus_id: 'POC-FUNDS-REWARD',
         status: 'Created',
         type: 'ReloadBonus',
         currency: currency || user.currency
-    });
+    }));
 
-    // Sync balances (Both Real and Bonus)
-    await ftService.pushEvent(user.id, 'balance', {
+    telemetry.push(await ftService.pushEvent(user.id, 'balance', {
         amount: user.balance,
         bonus_amount: newBonusBalance,
         currency: user.currency
+    }));
+
+    ftService.logActivity('inbound', {
+        method: 'POST',
+        endpoint: '/bonus/credit/funds',
+        status: 200,
+        payload: { request: req.body, response: 'OK' }
     });
 
     res.status(200).send('OK');
+});
+
+// New endpoint to fetch Backend <=> FT activities
+router.get('/activities', async (req, res) => {
+    res.json(ftService.getActivities());
 });
 
 module.exports = router;
