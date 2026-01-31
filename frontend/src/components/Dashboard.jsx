@@ -156,8 +156,11 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         window.FasttrackCrm.init(data.token);
                         console.log('[FT OnSite] Success: Initialized (v1.9)');
                         setIsFTInitialized(true);
-                        setStatus('Fast Track Ready (v1.9)');
+                        setStatus('Fast Track Ready (v1.1)');
                         state.isFTConnectInProgress = false;
+
+                        // v1.1 Polish: Log available methods for debugging
+                        console.log('[FT OnSite] Available Methods:', Object.keys(window.FasttrackCrm));
                     }
                 };
 
@@ -166,7 +169,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 window.source = savedOrigin;
                 window.fasttrack = {
                     enableJWT: true,
-                    integrationVersion: '1.0', // v1.8: Downgrade to 1.0 for stability
+                    integrationVersion: 1.1, // v1.1 is required for some Inbox features
                     autoInit: false,
                     inbox: { enable: true }
                 };
@@ -383,8 +386,19 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                     {/* Fast Track Inbox Button */}
                     <button
-                        className="btn-outline"
-                        onClick={() => window.FasttrackCrm?.toggleInbox()}
+                        className="btn-outline ft-crm-inbox-button"
+                        onClick={() => {
+                            console.log('[FT OnSite] Inbox button clicked');
+                            if (window.FasttrackCrm) {
+                                if (typeof window.FasttrackCrm.toggleInbox === 'function') {
+                                    window.FasttrackCrm.toggleInbox();
+                                } else if (typeof window.FasttrackCrm.open === 'function') {
+                                    window.FasttrackCrm.open();
+                                } else {
+                                    console.error('[FT OnSite] No inbox toggle method found on FasttrackCrm object');
+                                }
+                            }
+                        }}
                         style={{ position: 'relative', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                         Inbox
