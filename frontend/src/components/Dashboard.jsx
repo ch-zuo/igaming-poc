@@ -3,10 +3,10 @@ import axios from 'axios';
 import ActivitySidebar from './ActivitySidebar';
 import { getBalance, getBonusList, updateUser, creditBonus, triggerRegistration, logout as apiLogout } from '../services/api';
 
-// Global Singleton Guard for Fast Track (v1.4)
-// This survives React component re-mounts but not full page refreshes
+// Global Singleton Guard for Fast Track (v1.5)
 let isFTScriptLoaded = false;
 let isFTLibraryInitializing = false;
+let lastInitializedFTToken = null; // Track if we've already initialized this specific token
 
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
@@ -101,7 +101,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         const initFastTrack = async () => {
             try {
                 ftInitRef.current = true;
-                console.log('[FT OnSite][v1.4] Start Init Flow...');
+                console.log('[FT OnSite][v1.5] Start Init Flow...');
 
                 // 1. Get the fresh JWT token
                 const { data } = await axios.get('/api/ft-token', {
@@ -110,9 +110,15 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
                 const runInit = () => {
                     if (window.FasttrackCrm) {
-                        // Crucial: init can be called multiple times to re-authenticate
+                        // v1.5: ONLY init if the token is actually new
+                        if (lastInitializedFTToken === data.token) {
+                            console.log('[FT OnSite] Token already initialized, skipping redundant init.');
+                            return;
+                        }
+
+                        lastInitializedFTToken = data.token;
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized/Re-authenticated (v1.4)');
+                        console.log('[FT OnSite] Success: Initialized/Re-authenticated (v1.5)');
                         setIsFTInitialized(true);
                         setStatus('Fast Track Ready!');
                     }
