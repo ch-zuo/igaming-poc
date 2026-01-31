@@ -50,7 +50,7 @@ router.post('/authenticate', authenticateUser, async (req, res) => {
 
     res.json({
         sid: 'session-' + req.user.id + '-' + Date.now(),
-        user_id: req.user.id,
+        user: req.user, // Return full user object containing brand configs
         currency: req.user.currency,
         origin: PLATFORM_ORIGIN,
         _ft_telemetry: telemetry

@@ -17,11 +17,20 @@ function Dashboard({ user: initialUser, token, onLogout }) {
     const [outboundLogs, setOutboundLogs] = useState([]);
 
     // Brand Settings for Fast Track On-Site
-    const [brandName, setBrandName] = useState(user.ft_brand_name || '');
-    const [origin, setOrigin] = useState(user.ft_origin || '');
-    const [jwtSecret, setJwtSecret] = useState(user.ft_jwt_secret || '');
+    const [brandName, setBrandName] = useState(user?.ft_brand_name || '');
+    const [origin, setOrigin] = useState(user?.ft_origin || '');
+    const [jwtSecret, setJwtSecret] = useState(user?.ft_jwt_secret || '');
     const [unreadCount, setUnreadCount] = useState(0);
     const [isFTInitialized, setIsFTInitialized] = useState(false);
+
+    // Sync state if user prop changes (e.g. after login or update)
+    useEffect(() => {
+        if (user) {
+            setBrandName(user.ft_brand_name || '');
+            setOrigin(user.ft_origin || '');
+            setJwtSecret(user.ft_jwt_secret || '');
+        }
+    }, [user]);
 
     // Poll for Backend <=> FT Activities (Source of Truth)
     useEffect(() => {
