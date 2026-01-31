@@ -3,6 +3,11 @@ import axios from 'axios';
 import ActivitySidebar from './ActivitySidebar';
 import { getBalance, getBonusList, updateUser, creditBonus, triggerRegistration, logout as apiLogout } from '../services/api';
 
+// Global Singleton Guard for Fast Track (v1.4)
+// This survives React component re-mounts but not full page refreshes
+let isFTScriptLoaded = false;
+let isFTLibraryInitializing = false;
+
 function Dashboard({ user: initialUser, token, onLogout }) {
     const [user, setUser] = useState(initialUser);
     const [balance, setBalance] = useState(0);
@@ -90,13 +95,13 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
         if (!savedBrand || !savedOrigin || !savedSecret) return;
 
-        // Guard specifically for the current instance's attempt
+        // Use a local ref to avoid redundant calls during a single mount lifecycle
         if (ftInitRef.current) return;
 
         const initFastTrack = async () => {
             try {
                 ftInitRef.current = true;
-                console.log('[FT OnSite][v1.3] Start Init...');
+                console.log('[FT OnSite][v1.4] Start Init Flow...');
 
                 // 1. Get the fresh JWT token
                 const { data } = await axios.get('/api/ft-token', {
@@ -105,17 +110,19 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
                 const runInit = () => {
                     if (window.FasttrackCrm) {
+                        // Crucial: init can be called multiple times to re-authenticate
                         window.FasttrackCrm.init(data.token);
-                        console.log('[FT OnSite] Success: Initialized/Re-authenticated');
+                        console.log('[FT OnSite] Success: Initialized/Re-authenticated (v1.4)');
                         setIsFTInitialized(true);
                         setStatus('Fast Track Ready!');
                     }
                 };
 
-                // 2. Check if script/library already exists
+                // 2. Check global singleton state
                 if (window.FasttrackCrm) {
                     runInit();
-                } else if (document.getElementById('ft-onsite-script')) {
+                } else if (isFTScriptLoaded || isFTLibraryInitializing) {
+                    // Loader is coming, wait for it
                     const checkInterval = setInterval(() => {
                         if (window.FasttrackCrm) {
                             clearInterval(checkInterval);
@@ -123,7 +130,9 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                         }
                     }, 500);
                 } else {
-                    // 3. Fresh injection
+                    // 3. Fresh Injection (Only happens once per page load)
+                    isFTLibraryInitializing = true;
+
                     window.fasttrackbrand = savedBrand;
                     window.source = savedOrigin;
                     window.fasttrack = {
@@ -139,6 +148,8 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                     script.src = `https://lib-staging.rewards.tech/loader/fasttrack-crm.js?d=${new Date().setHours(0, 0, 0, 0)}`;
 
                     script.onload = () => {
+                        isFTScriptLoaded = true;
+                        isFTLibraryInitializing = false;
                         if (window.FastTrackLoader && !window.FasttrackCrm) {
                             new window.FastTrackLoader();
                             setTimeout(runInit, 1000);
@@ -341,9 +352,6 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 </div>
             </header>
 
-            {/* Fast Track Mandatory Container */}
-            <div id="fasttrack-crm"></div>
-
             <div className="grid-layout">
                 <div className="span-two">
                     <div className="wallets-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
@@ -460,7 +468,7 @@ function Dashboard({ user: initialUser, token, onLogout }) {
 
                 <ActivitySidebar inboundLogs={inboundLogs} outboundLogs={outboundLogs} />
             </div>
-        </div>
+        </div >
     );
 }
 
