@@ -81,23 +81,6 @@ function Dashboard({ user: initialUser, token, onLogout }) {
         };
     }, []);
 
-    // Simulate Inbound Activity (Webhooks)
-    useEffect(() => {
-        const scenarios = [
-            { method: 'POST', endpoint: '/webhook/deposit', status: 200, payload: { event: 'payment.success', amount: 100, currency: 'EUR', user_id: user.user_id } },
-            { method: 'POST', endpoint: '/webhook/kyc', status: 200, payload: { event: 'identity.verified', status: 'approved', user_id: user.user_id } },
-            { method: 'POST', endpoint: '/webhook/bonus', status: 200, payload: { event: 'bonus.awarded', type: 'loyalty_spin', value: 5 } }
-        ];
-
-        const interval = setInterval(() => {
-            if (Math.random() > 0.7) {
-                const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-                addLog('inbound', scenario);
-            }
-        }, 8000);
-
-        return () => clearInterval(interval);
-    }, [user.user_id]);
 
     useEffect(() => {
         fetchBalance();
@@ -262,86 +245,90 @@ function Dashboard({ user: initialUser, token, onLogout }) {
                 </div>
             </header>
 
-            <div className="wallets-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                <div className="hero-balance floating">
-                    <label>Real Balance</label>
-                    <h2>{balance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
-                </div>
-                <div className="hero-balance floating bonus-wallet" style={{ borderLeft: '4px solid var(--accent-gold, #ffd700)' }}>
-                    <label>Bonus Balance</label>
-                    <h2>{bonusBalance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
-                </div>
-            </div>
-
-            <div className="status-banner glass-panel" style={{ marginBottom: '24px', padding: '12px', textAlign: 'center', color: 'var(--primary)' }}>
-                {status}
-            </div>
-
             <div className="grid-layout">
-                <div className="main-column">
-                    <section className="glass-panel">
-                        <div className="section-header">
-                            <h3>🎰 Game Actions</h3>
+                <div className="span-two">
+                    <div className="wallets-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                        <div className="hero-balance floating">
+                            <label>Real Balance</label>
+                            <h2>{balance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-                            <button className="btn-primary" onClick={handleDeposit} style={{ height: '100px', fontSize: '1.1rem' }}>
-                                Deposit 100 {currency}
-                            </button>
-                            <button className="btn-secondary" onClick={handlePlayRound} style={{ height: '100px', fontSize: '1.4rem' }}>
-                                Play Slot (Bet 10)
-                            </button>
+                        <div className="hero-balance floating bonus-wallet" style={{ borderLeft: '4px solid var(--accent-gold, #ffd700)' }}>
+                            <label>Bonus Balance</label>
+                            <h2>{bonusBalance.toFixed(2)} <small style={{ fontSize: '1.2rem' }}>{currency}</small></h2>
                         </div>
-                    </section>
+                    </div>
 
-                    <section className="glass-panel">
-                        <div className="section-header">
-                            <h3>👤 User Profile</h3>
-                        </div>
-                        <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label>First Name</label>
-                                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label>Surname</label>
-                                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Surname" />
-                            </div>
-                            <button type="submit" className="btn-primary" style={{ padding: '14px 24px' }}>Update Profile</button>
-                        </form>
-                    </section>
-                </div>
+                    <div className="status-banner glass-panel" style={{ marginBottom: '24px', padding: '12px', textAlign: 'center', color: 'var(--primary)' }}>
+                        {status}
+                    </div>
 
-                <div className="side-column">
-                    <section className="glass-panel">
-                        <div className="section-header">
-                            <h3>⚡ Simulation</h3>
-                        </div>
-                        <div className="sim-grid">
-                            <button className="btn-outline" onClick={handleToggleBlock} style={{ gridColumn: 'span 2' }}>Sim Block Event</button>
-                            <button className="btn-outline" onClick={handleToggleConsent} style={{ gridColumn: 'span 2' }}>
-                                Marketing: {marketingOpted ? 'OPT-IN' : 'OPT-OUT'}
-                            </button>
-                        </div>
-                    </section>
-
-                    <section className="glass-panel">
-                        <div className="section-header">
-                            <h3>🎁 Active Bonuses</h3>
-                        </div>
-                        <div className="bonus-list">
-                            {bonuses.length > 0 ? bonuses.map(b => (
-                                <div key={b.value} className="bonus-card">
-                                    <div>
-                                        <h4>{b.text}</h4>
-                                        <p>Limited time offer</p>
-                                    </div>
-                                    <button className="btn-primary" style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem' }} onClick={() => handleClaimBonus(b.value)}>
-                                        Claim
+                    <div className="sub-grid-layout">
+                        <div className="main-column">
+                            <section className="glass-panel">
+                                <div className="section-header">
+                                    <h3>🎰 Game Actions</h3>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+                                    <button className="btn-primary" onClick={handleDeposit} style={{ height: '100px', fontSize: '1.1rem' }}>
+                                        Deposit 100 {currency}
+                                    </button>
+                                    <button className="btn-secondary" onClick={handlePlayRound} style={{ height: '100px', fontSize: '1.4rem' }}>
+                                        Play Slot (Bet 10)
                                     </button>
                                 </div>
-                            )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available at the moment.</p>}
+                            </section>
+
+                            <section className="glass-panel">
+                                <div className="section-header">
+                                    <h3>👤 User Profile</h3>
+                                </div>
+                                <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>First Name</label>
+                                        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>Surname</label>
+                                        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Surname" />
+                                    </div>
+                                    <button type="submit" className="btn-primary" style={{ padding: '14px 24px' }}>Update Profile</button>
+                                </form>
+                            </section>
                         </div>
-                    </section>
+
+                        <div className="side-column">
+                            <section className="glass-panel">
+                                <div className="section-header">
+                                    <h3>⚡ Simulation</h3>
+                                </div>
+                                <div className="sim-grid">
+                                    <button className="btn-outline" onClick={handleToggleBlock} style={{ gridColumn: 'span 2' }}>Sim Block Event</button>
+                                    <button className="btn-outline" onClick={handleToggleConsent} style={{ gridColumn: 'span 2' }}>
+                                        Marketing: {marketingOpted ? 'OPT-IN' : 'OPT-OUT'}
+                                    </button>
+                                </div>
+                            </section>
+
+                            <section className="glass-panel">
+                                <div className="section-header">
+                                    <h3>🎁 Active Bonuses</h3>
+                                </div>
+                                <div className="bonus-list">
+                                    {bonuses.length > 0 ? bonuses.map(b => (
+                                        <div key={b.value} className="bonus-card">
+                                            <div>
+                                                <h4>{b.text}</h4>
+                                                <p>Limited time offer</p>
+                                            </div>
+                                            <button className="btn-primary" style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem' }} onClick={() => handleClaimBonus(b.value)}>
+                                                Claim
+                                            </button>
+                                        </div>
+                                    )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No bonuses available at the moment.</p>}
+                                </div>
+                            </section>
+                        </div>
+                    </div>
                 </div>
 
                 <ActivitySidebar inboundLogs={inboundLogs} outboundLogs={outboundLogs} />

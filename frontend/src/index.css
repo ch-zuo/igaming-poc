@@ -139,17 +139,33 @@ header {
   display: grid;
   grid-template-columns: 1fr 380px 420px;
   gap: 32px;
+  align-items: start;
+}
+
+.span-two {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sub-grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 32px;
 }
 
 @media (max-width: 1400px) {
   .grid-layout {
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: 1fr !important;
   }
-}
 
-@media (max-width: 1100px) {
-  .grid-layout {
-    grid-template-columns: 1fr;
+  .span-two {
+    grid-column: span 1 !important;
+  }
+
+  .sub-grid-layout {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -368,9 +384,9 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: calc(100vh - 200px);
+  height: calc(100vh - 120px);
   position: sticky;
-  top: 40px;
+  top: 20px;
 }
 
 .log-section {
@@ -380,7 +396,7 @@ input:focus {
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-m);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .log-section-header {
@@ -474,6 +490,8 @@ input:focus {
   white-space: pre-wrap;
   word-break: break-all;
   color: #fff;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .inbound-neon {
